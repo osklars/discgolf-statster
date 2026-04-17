@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { PanResponder, Pressable, StyleSheet, View } from 'react-native';
+import { PanResponder, StyleSheet, View } from 'react-native';
 import { Circle, Line, Svg, Text as SvgText } from 'react-native-svg';
 import { Colors, Typography } from '../../../../constants/theme';
 import type { Grid2DParam } from '../../types';
@@ -16,6 +16,8 @@ interface Props {
 const PAD = 26;
 const DOT_R = 7;
 const GRID_SIZE = 200;
+const DOT_HIT_SLOP = 12;
+const TAP_THRESHOLD = 8;
 
 function snapToStep(raw: number, min: number, max: number, step: number): number {
   const steps = Math.round((raw - min) / step);
@@ -29,21 +31,24 @@ export function Grid2DInput({ param, valueX, valueY, onDragStart, onLiveUpdate, 
   const liveRef = useRef<{ x: number; y: number } | null>(null);
   const [, forceUpdate] = useState(0);
 
-  const isActiveRef = useRef(false);
-  const [isActive, setIsActive] = useState(false);
+  const isDotDragRef = useRef(false);
 
   const containerRef = useRef<View>(null);
-  // Only X offset is needed — Y uses locationY which is scroll-invariant.
   const pageOffsetX = useRef(0);
   const widthRef = useRef(300);
   const plotX0Ref = useRef(0);
   const plotSizeRef = useRef(GRID_SIZE);
 
+  const valueXRef = useRef<number | undefined>(valueX);
+  const valueYRef = useRef<number | undefined>(valueY);
+  valueXRef.current = valueX;
+  valueYRef.current = valueY;
+
   const plotSizeFor = (w: number) => Math.min(w - PAD * 2, GRID_SIZE);
   const plotX0For = (w: number) => (w - plotSizeFor(w)) / 2;
 
-  // X: uses pageX - pageOffsetX (horizontal scroll is not a concern).
-  // Y: uses locationY directly — it's relative to this View, unaffected by vertical scroll.
+  // X: pageX - pageOffsetX (no horizontal scroll, offset stays valid).
+  // Y: locationY directly — relative to this View, scroll-invariant.
   const valueFromTouch = (pageX: number, locationY: number): { x: number; y: number } => {
     const relX = pageX - pageOffsetX.current;
     const ps = plotSizeRef.current;
@@ -56,30 +61,69 @@ export function Grid2DInput({ param, valueX, valueY, onDragStart, onLiveUpdate, 
     };
   };
 
+  const dotRelPos = (): { x: number; y: number } | null => {
+    const vx = liveRef.current?.x ?? valueXRef.current;
+    const vy = liveRef.current?.y ?? valueYRef.current;
+    if (vx === undefined || vy === undefined) return null;
+    const ps = plotSizeRef.current;
+    const px0 = plotX0Ref.current;
+    return {
+      x: px0 + ((vx - axisX.min) / (axisX.max - axisX.min)) * ps,
+      y: PAD + (1 - (vy - axisY.min) / (axisY.max - axisY.min)) * ps,
+    };
+  };
+
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => isActiveRef.current,
-      onMoveShouldSetPanResponder: () => isActiveRef.current,
-      onPanResponderGrant: (evt) => {
-        onDragStart();
-        const v = valueFromTouch(evt.nativeEvent.pageX, evt.nativeEvent.locationY);
-        liveRef.current = v;
-        forceUpdate((n) => n + 1);
-        onLiveUpdate(v.x, v.y);
+      onStartShouldSetPanResponder: (evt) => {
+        // Detect dot touch here so we can disable scrolling before any movement
+        isDotDragRef.current = false;
+        const dot = dotRelPos();
+        if (dot) {
+          const relX = evt.nativeEvent.pageX - pageOffsetX.current;
+          const locY = evt.nativeEvent.locationY;
+          const dx = relX - dot.x;
+          const dy = locY - dot.y;
+          isDotDragRef.current = Math.sqrt(dx * dx + dy * dy) <= DOT_R + DOT_HIT_SLOP;
+        }
+        if (isDotDragRef.current) {
+          onDragStart(); // disable ScrollView scroll before first move event
+        }
+        return true;
       },
+      onMoveShouldSetPanResponder: () => false,
+      onPanResponderTerminationRequest: () => !isDotDragRef.current,
+
+      onPanResponderGrant: (_evt) => {
+        // dot detection and onDragStart already handled in onStartShouldSetPanResponder
+      },
+
       onPanResponderMove: (evt) => {
+        if (!isDotDragRef.current) return;
         const v = valueFromTouch(evt.nativeEvent.pageX, evt.nativeEvent.locationY);
         liveRef.current = v;
         forceUpdate((n) => n + 1);
         onLiveUpdate(v.x, v.y);
       },
-      onPanResponderRelease: (evt) => {
-        const v = valueFromTouch(evt.nativeEvent.pageX, evt.nativeEvent.locationY);
+
+      onPanResponderRelease: (evt, gestureState) => {
+        const wasDotDrag = isDotDragRef.current;
+        isDotDragRef.current = false;
+        const isTap =
+          Math.abs(gestureState.dx) <= TAP_THRESHOLD &&
+          Math.abs(gestureState.dy) <= TAP_THRESHOLD;
+
         liveRef.current = null;
         forceUpdate((n) => n + 1);
-        onCommit(v.x, v.y);
+
+        if (isTap || wasDotDrag) {
+          const v = valueFromTouch(evt.nativeEvent.pageX, evt.nativeEvent.locationY);
+          onCommit(v.x, v.y);
+        }
       },
+
       onPanResponderTerminate: () => {
+        isDotDragRef.current = false;
         liveRef.current = null;
         forceUpdate((n) => n + 1);
       },
@@ -96,7 +140,6 @@ export function Grid2DInput({ param, valueX, valueY, onDragStart, onLiveUpdate, 
     });
   }, []);
 
-  // SVG drawing values (derived from state for render, refs used in pan callbacks)
   const plotSize = plotSizeFor(containerWidth);
   const svgWidth = containerWidth;
   const svgHeight = plotSize + PAD * 2;
@@ -138,7 +181,6 @@ export function Grid2DInput({ param, valueX, valueY, onDragStart, onLiveUpdate, 
         <Line x1={plotX0} y1={plotY0} x2={plotX0} y2={plotY0 + plotSize} stroke={Colors.separator} strokeWidth={1} />
         <Line x1={plotX0 + plotSize} y1={plotY0} x2={plotX0 + plotSize} y2={plotY0 + plotSize} stroke={Colors.separator} strokeWidth={1} />
 
-        {/* X grid lines + bottom ticks */}
         {xGridValues.map((v) => {
           const cx = canvasXForValue(v);
           return (
@@ -149,7 +191,6 @@ export function Grid2DInput({ param, valueX, valueY, onDragStart, onLiveUpdate, 
           );
         })}
 
-        {/* Y grid lines + left ticks */}
         {yGridValues.map((v) => {
           const cy = canvasYForValue(v);
           return (
@@ -160,15 +201,12 @@ export function Grid2DInput({ param, valueX, valueY, onDragStart, onLiveUpdate, 
           );
         })}
 
-        {/* X end labels (bottom) */}
         <SvgText x={plotX0} y={plotY0 + plotSize + 17} fontSize={Typography.labelSm.fontSize} fill={Colors.textMuted} textAnchor="middle">
           {axisX.lblMin}
         </SvgText>
         <SvgText x={plotX0 + plotSize} y={plotY0 + plotSize + 17} fontSize={Typography.labelSm.fontSize} fill={Colors.textMuted} textAnchor="middle">
           {axisX.lblMax}
         </SvgText>
-
-        {/* Y end labels (left: top=max, bottom=min) */}
         <SvgText x={plotX0 - 6} y={plotY0 + 4} fontSize={Typography.labelSm.fontSize} fill={Colors.textMuted} textAnchor="end">
           {axisY.lblMax}
         </SvgText>
@@ -177,27 +215,7 @@ export function Grid2DInput({ param, valueX, valueY, onDragStart, onLiveUpdate, 
         </SvgText>
 
         {hasDot && <Circle cx={dotCX} cy={dotCY} r={DOT_R} fill={Colors.primary} />}
-
-        {/* Active ring */}
-        {hasDot && isActive && (
-          <Circle cx={dotCX} cy={dotCY} r={DOT_R + 4} fill="none" stroke={Colors.primaryBorder} strokeWidth={1} strokeOpacity={0.4} />
-        )}
       </Svg>
-
-      {/* Inactive overlay — captures tap to activate without blocking scroll */}
-      {!isActive && (
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={(evt) => {
-            isActiveRef.current = true;
-            setIsActive(true);
-            const v = valueFromTouch(evt.nativeEvent.pageX, evt.nativeEvent.locationY);
-            liveRef.current = null;
-            forceUpdate((n) => n + 1);
-            onCommit(v.x, v.y);
-          }}
-        />
-      )}
     </View>
   );
 }

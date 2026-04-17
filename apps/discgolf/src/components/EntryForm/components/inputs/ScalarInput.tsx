@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { PanResponder, Pressable, StyleSheet, View } from 'react-native';
+import { PanResponder, StyleSheet, View } from 'react-native';
 import { Circle, Line, Svg, Text as SvgText } from 'react-native-svg';
 import { Colors, Spacing, Typography } from '../../../../constants/theme';
 import type { ScalarParam } from '../../types';
@@ -17,6 +17,8 @@ const AXIS_Y = 22;
 const DOT_R = 7;
 const TICK_H_MAJOR = 8;
 const PAD_H = Spacing.lg;
+const DOT_HIT_SLOP = 12;
+const TAP_THRESHOLD = 8;
 
 function snapToStep(raw: number, min: number, max: number, step: number): number {
   const steps = Math.round((raw - min) / step);
@@ -30,19 +32,17 @@ export function ScalarInput({ param, value, onDragStart, onLiveUpdate, onCommit 
   const liveValueRef = useRef<number | null>(null);
   const [, forceUpdate] = useState(0);
 
-  // Whether the user has tapped to activate drag mode.
-  // Resets to false on unmount (i.e. when the row collapses).
-  const isActiveRef = useRef(false);
-  const [isActive, setIsActive] = useState(false);
-
   const containerRef = useRef<View>(null);
   const pageOffsetX = useRef(0);
   const widthRef = useRef(300);
+  const valueRef = useRef<number | undefined>(value);
+  valueRef.current = value;
+
+  // Tracks whether the current gesture started on the dot.
+  const isDotDragRef = useRef(false);
 
   const trackWidthFor = (w: number) => w - PAD_H * 2;
 
-  // Convert absolute screen X → snapped param value.
-  // Reads refs so always current even from PanResponder closures.
   const valueFromPageX = (pageX: number): number => {
     const relX = pageX - pageOffsetX.current;
     const tw = trackWidthFor(widthRef.current);
@@ -50,30 +50,58 @@ export function ScalarInput({ param, value, onDragStart, onLiveUpdate, onCommit 
     return snapToStep(raw, min, max, step);
   };
 
+  const dotRelX = (): number => {
+    const v = liveValueRef.current ?? valueRef.current;
+    if (v === undefined) return -9999;
+    return PAD_H + ((v - min) / (max - min)) * trackWidthFor(widthRef.current);
+  };
+
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => isActiveRef.current,
-      onMoveShouldSetPanResponder: () => isActiveRef.current,
+      // Always claim the touch — SVG has no competing responder.
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => false,
+
+      // Yield to the ScrollView for vertical scrolls, but hold on during dot drag.
+      onPanResponderTerminationRequest: () => !isDotDragRef.current,
+
       onPanResponderGrant: (evt) => {
-        onDragStart();
-        const v = valueFromPageX(evt.nativeEvent.pageX);
-        liveValueRef.current = v;
-        forceUpdate((n) => n + 1);
-        onLiveUpdate(v);
+        const relX = evt.nativeEvent.pageX - pageOffsetX.current;
+        isDotDragRef.current =
+          valueRef.current !== undefined &&
+          Math.abs(relX - dotRelX()) <= DOT_R + DOT_HIT_SLOP;
+        if (isDotDragRef.current) {
+          onDragStart(); // disables ScrollView scroll for the duration of the drag
+        }
       },
+
       onPanResponderMove: (evt) => {
+        if (!isDotDragRef.current) return;
         const v = valueFromPageX(evt.nativeEvent.pageX);
         liveValueRef.current = v;
         forceUpdate((n) => n + 1);
         onLiveUpdate(v);
       },
-      onPanResponderRelease: (evt) => {
-        const v = valueFromPageX(evt.nativeEvent.pageX);
+
+      onPanResponderRelease: (evt, gestureState) => {
+        const wasDotDrag = isDotDragRef.current;
+        isDotDragRef.current = false;
+        const isTap =
+          Math.abs(gestureState.dx) <= TAP_THRESHOLD &&
+          Math.abs(gestureState.dy) <= TAP_THRESHOLD;
+
         liveValueRef.current = null;
         forceUpdate((n) => n + 1);
-        onCommit(v);
+
+        if (isTap || wasDotDrag) {
+          onCommit(valueFromPageX(evt.nativeEvent.pageX));
+        }
+        // else: horizontal swipe not on dot — ignore
       },
+
+      // ScrollView stole the responder — clean up without committing.
       onPanResponderTerminate: () => {
+        isDotDragRef.current = false;
         liveValueRef.current = null;
         forceUpdate((n) => n + 1);
       },
@@ -108,14 +136,11 @@ export function ScalarInput({ param, value, onDragStart, onLiveUpdate, onCommit 
       {...panResponder.panHandlers}
     >
       <Svg width={containerWidth} height={HEIGHT}>
-        {/* Axis line */}
         <Line
           x1={PAD_H} y1={AXIS_Y}
           x2={PAD_H + trackWidth} y2={AXIS_Y}
           stroke={Colors.separator} strokeWidth={1.5}
         />
-
-        {/* Ticks */}
         {ticks.map((v) => {
           const x = xForValue(v);
           return (
@@ -127,8 +152,6 @@ export function ScalarInput({ param, value, onDragStart, onLiveUpdate, onCommit 
             />
           );
         })}
-
-        {/* End labels */}
         <SvgText
           x={PAD_H} y={AXIS_Y + TICK_H_MAJOR / 2 + 13}
           fontSize={Typography.labelSm.fontSize} fill={Colors.textMuted} textAnchor="middle"
@@ -141,30 +164,8 @@ export function ScalarInput({ param, value, onDragStart, onLiveUpdate, onCommit 
         >
           {lblMax}
         </SvgText>
-
-        {/* Dot — shown when a value is set or being dragged */}
         {hasDot && <Circle cx={dotX} cy={AXIS_Y} r={DOT_R} fill={Colors.primary} />}
-
-        {/* Subtle ring on the dot when active to signal drag-ready */}
-        {hasDot && isActive && (
-          <Circle cx={dotX} cy={AXIS_Y} r={DOT_R + 4} fill="none" stroke={Colors.primaryBorder} strokeWidth={1} strokeOpacity={0.4} />
-        )}
       </Svg>
-
-      {/* Inactive overlay — captures tap to activate, doesn't block scroll */}
-      {!isActive && (
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={(evt) => {
-            isActiveRef.current = true;
-            setIsActive(true);
-            const v = valueFromPageX(evt.nativeEvent.pageX);
-            liveValueRef.current = null;
-            forceUpdate((n) => n + 1);
-            onCommit(v);
-          }}
-        />
-      )}
     </View>
   );
 }
