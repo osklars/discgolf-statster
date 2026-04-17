@@ -12,10 +12,10 @@ interface Props {
   onCommit: (value: number) => void;
 }
 
-const HEIGHT = 72;
-const AXIS_Y = 36;
-const DOT_R = 8;
-const TICK_H_MAJOR = 10;
+const HEIGHT = 52;
+const AXIS_Y = 22;
+const DOT_R = 7;
+const TICK_H_MAJOR = 8;
 const PAD_H = Spacing.lg;
 
 function snapToStep(raw: number, min: number, max: number, step: number): number {

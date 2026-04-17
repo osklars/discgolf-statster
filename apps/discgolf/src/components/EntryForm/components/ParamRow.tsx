@@ -3,7 +3,6 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
   Colors,
   HIT_SLOP,
-  MIN_HIT,
   Spacing,
   Typography,
   hairline,
@@ -47,7 +46,7 @@ export function ParamRow({
   const isSet = value !== undefined && value !== '';
   const committedDisplay = isSet ? formatValue(param, value) : '';
 
-  // During a drag, only this row re-renders via liveDisplay — the list stays still.
+  // During a drag only this row re-renders — the list stays still.
   const [liveDisplay, setLiveDisplay] = useState<string | null>(null);
   const headerDisplay = liveDisplay !== null ? liveDisplay : committedDisplay;
 
@@ -102,23 +101,11 @@ export function ParamRow({
       }
       case 'named': {
         const p = param as NamedParam;
-        return (
-          <PillPicker
-            options={p.options}
-            selectedId={value}
-            onSelect={onCommit}
-          />
-        );
+        return <PillPicker options={p.options} selectedId={value} onSelect={onCommit} />;
       }
       case 'disc': {
         const p = param as DiscParam;
-        return (
-          <DiscPicker
-            discs={p.discs}
-            selectedId={value}
-            onSelect={onCommit}
-          />
-        );
+        return <DiscPicker discs={p.discs} selectedId={value} onSelect={onCommit} />;
       }
       case 'grid2d': {
         const p = param as Grid2DParam;
@@ -141,41 +128,46 @@ export function ParamRow({
 
   return (
     <View style={styles.wrapper}>
-      <TouchableOpacity
-        style={styles.header}
-        onPress={onToggle}
-        activeOpacity={0.7}
-      >
-        <View style={[styles.dot, isSet && styles.dotFilled]} />
+      {/*
+        Legend-style separator: the param name sits in a gap in the line.
+        Right side holds the current value, clear button, and chevron.
+      */}
+      <View style={styles.legendRow}>
+        {/* Name — no left line nub, starts at the content margin */}
+        <TouchableOpacity onPress={onToggle} activeOpacity={0.6} style={styles.nameTap} hitSlop={HIT_SLOP}>
+          <Text style={styles.nameText} numberOfLines={1}>
+            {param.name}
+          </Text>
+        </TouchableOpacity>
 
-        <Text style={styles.name} numberOfLines={1}>
-          {param.name}
-        </Text>
+        {/* Separator line filling the gap after the name */}
+        <View style={styles.sepLine} />
 
+        {/* Value */}
         {isSet && (
-          <View style={styles.valueRow}>
-            <Text style={styles.valueText} numberOfLines={1}>
-              {headerDisplay}
-            </Text>
-            <TouchableOpacity
-              style={styles.clearBtn}
-              onPress={(e) => {
-                e.stopPropagation();
-                onClear();
-              }}
-              hitSlop={HIT_SLOP}
-            >
-              <Text style={styles.clearText}>×</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.valueText} numberOfLines={1}>
+            {headerDisplay}
+          </Text>
         )}
 
-        <Text style={[styles.chevron, isExpanded && styles.chevronUp]}>›</Text>
-      </TouchableOpacity>
+        {/* Clear button */}
+        {isSet && (
+          <TouchableOpacity style={styles.clearBtn} onPress={onClear} hitSlop={HIT_SLOP}>
+            <Text style={styles.clearText}>×</Text>
+          </TouchableOpacity>
+        )}
 
+        {/* Chevron toggle */}
+        <TouchableOpacity onPress={onToggle} style={styles.chevronBtn} hitSlop={HIT_SLOP}>
+          <Text style={[styles.chevron, isExpanded && styles.chevronUp]}>›</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Collapsible body — input starts immediately below the legend line */}
       {isExpanded && <View style={styles.body}>{renderInput()}</View>}
 
-      <View style={styles.separator} />
+      {/* Bottom separator */}
+      <View style={styles.bottomSep} />
     </View>
   );
 }
@@ -184,70 +176,70 @@ const styles = StyleSheet.create({
   wrapper: {
     backgroundColor: Colors.background,
   },
-  header: {
+  legendRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: MIN_HIT,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    gap: Spacing.sm,
+    paddingLeft: Spacing.lg,
+    paddingRight: Spacing.md,
+    minHeight: 28,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: Colors.dotEmpty,
-    backgroundColor: 'transparent',
-    flexShrink: 0,
+  nameTap: {
+    // Just enough padding to make tap target reasonable, no extra height
+    paddingVertical: Spacing.xs,
   },
-  dotFilled: {
-    backgroundColor: Colors.dot,
-    borderColor: Colors.dot,
-  },
-  name: {
-    ...Typography.body,
-    color: Colors.text,
-    flex: 1,
-  },
-  valueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
+  nameText: {
+    ...Typography.labelSm,
+    color: Colors.textMuted,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
     flexShrink: 1,
+  },
+  sepLine: {
+    flex: 1,
+    height: hairline,
+    backgroundColor: Colors.separator,
+    marginLeft: Spacing.sm,
+    marginRight: Spacing.xs,
   },
   valueText: {
-    ...Typography.label,
-    color: Colors.textMuted,
+    ...Typography.labelSm,
+    color: Colors.primary,
+    fontWeight: '600',
     flexShrink: 1,
+    maxWidth: 100,
   },
   clearBtn: {
-    minWidth: 32,
-    minHeight: 32,
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
   clearText: {
-    fontSize: 18,
+    fontSize: 16,
     color: Colors.textMuted,
-    lineHeight: 20,
+    lineHeight: 18,
+  },
+  chevronBtn: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chevron: {
-    fontSize: 20,
+    fontSize: 18,
     color: Colors.textDisabled,
     transform: [{ rotate: '90deg' }],
-    flexShrink: 0,
-    lineHeight: 22,
+    lineHeight: 20,
   },
   chevronUp: {
     transform: [{ rotate: '270deg' }],
   },
   body: {
-    paddingBottom: Spacing.sm,
+    // No extra padding — inputs handle their own horizontal spacing
   },
-  separator: {
+  bottomSep: {
     height: hairline,
     backgroundColor: Colors.separator,
-    marginLeft: Spacing.lg,
   },
 });

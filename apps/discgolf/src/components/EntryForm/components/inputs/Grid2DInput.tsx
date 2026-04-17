@@ -13,9 +13,9 @@ interface Props {
   onCommit: (x: number, y: number) => void;
 }
 
-const PAD = 32;
-const DOT_R = 8;
-const GRID_SIZE = 220;
+const PAD = 26;
+const DOT_R = 7;
+const GRID_SIZE = 200;
 
 function snapToStep(raw: number, min: number, max: number, step: number): number {
   const steps = Math.round((raw - min) / step);

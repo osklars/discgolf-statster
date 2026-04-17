@@ -7,10 +7,6 @@ function isGrid2D(p: Param): p is Grid2DParam {
   return p.type === 'grid2d';
 }
 
-function allParams(state: EntryFormState): Param[] {
-  return [...state.beforeParams, ...state.afterParams];
-}
-
 export function useEntryForm(
   beforeParams: Param[],
   afterParams: Param[],
@@ -22,7 +18,9 @@ export function useEntryForm(
   setActiveTab: (tab: 'before' | 'after') => void;
 } {
   const [activeTab, setActiveTab] = useState<'before' | 'after'>('before');
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(
+    () => new Set([...beforeParams.map((p) => p.id), ...afterParams.map((p) => p.id)]),
+  );
   const [values, setValues] = useState<Record<string, ParamValue>>({});
 
   const toggleExpanded = useCallback((id: string) => {
