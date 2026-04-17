@@ -2,7 +2,6 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
   Colors,
-  MIN_HIT,
   Radius,
   Spacing,
   Typography,
@@ -55,10 +54,10 @@ const styles = StyleSheet.create({
     borderWidth: hairline,
     borderColor: Colors.separator,
     borderRadius: Radius.pill,
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: MIN_HIT,
     backgroundColor: Colors.background,
   },
   pillSelected: {

@@ -9,6 +9,7 @@ export type ScalarParam = {
   unit?: string;
   lblMin: string;
   lblMax: string;
+  displayFormat?: string;
 };
 
 export type NamedParam = {
@@ -16,13 +17,6 @@ export type NamedParam = {
   name: string;
   type: 'named';
   options: { id: string; label: string }[];
-};
-
-export type DiscParam = {
-  id: string;
-  name: string;
-  type: 'disc';
-  discs: { id: string; label: string; subLabel: string }[];
 };
 
 export type Grid2DParam = {
@@ -33,7 +27,7 @@ export type Grid2DParam = {
   axisY: ScalarParam;
 };
 
-export type Param = ScalarParam | NamedParam | DiscParam | Grid2DParam;
+export type Param = ScalarParam | NamedParam | Grid2DParam;
 
 // always a string: scalar → "85", named/disc → optionId, grid2d → "85·3"
 export type ParamValue = string;

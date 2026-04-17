@@ -8,14 +8,12 @@ import {
   hairline,
 } from '../../../constants/theme';
 import type {
-  DiscParam,
   Grid2DParam,
   NamedParam,
   Param,
   ParamValue,
   ScalarParam,
 } from '../types';
-import { DiscPicker } from './inputs/DiscPicker';
 import { Grid2DInput } from './inputs/Grid2DInput';
 import { PillPicker } from './inputs/PillPicker';
 import { ScalarInput } from './inputs/ScalarInput';
@@ -69,9 +67,16 @@ export function ParamRow({
   const handleGrid2DLive = useCallback(
     (x: number, y: number) => {
       const p = param as Grid2DParam;
-      const fmtX = p.axisX.unit ? `${x}${p.axisX.unit}` : String(x);
-      const fmtY = p.axisY.unit ? `${y}${p.axisY.unit}` : String(y);
-      setLiveDisplay(`${fmtX} × ${fmtY}`);
+      const fmtAxis = (v: number, axis: ScalarParam): string => {
+        if (axis.displayFormat === 'hyzer') {
+          return v === 0 ? 'flat' : v > 0 ? `${v}a` : `${Math.abs(v)}h`;
+        }
+        if (axis.displayFormat === 'nose') {
+          return v === 0 ? '—' : v > 0 ? `${v}↑` : `${Math.abs(v)}↓`;
+        }
+        return axis.unit ? `${v}${axis.unit}` : String(v);
+      };
+      setLiveDisplay(`${fmtAxis(x, p.axisX)} × ${fmtAxis(y, p.axisY)}`);
     },
     [param],
   );
@@ -113,16 +118,6 @@ export function ParamRow({
         return (
           <PillPicker
             options={p.options}
-            selectedId={value}
-            onSelect={handleAutoCloseCommit}
-          />
-        );
-      }
-      case 'disc': {
-        const p = param as DiscParam;
-        return (
-          <DiscPicker
-            discs={p.discs}
             selectedId={value}
             onSelect={handleAutoCloseCommit}
           />

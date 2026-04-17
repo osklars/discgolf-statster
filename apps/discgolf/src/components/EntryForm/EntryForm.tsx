@@ -13,14 +13,14 @@ const DEMO_BEFORE: Param[] = [
   {
     id: 'disc',
     name: 'Disc',
-    type: 'disc',
-    discs: [
-      { id: 'd1', label: 'Destroyer', subLabel: 'distance' },
-      { id: 'd2', label: 'Buzzz', subLabel: 'midrange' },
-      { id: 'd3', label: 'Luna', subLabel: 'putter' },
-      { id: 'd4', label: 'Roc3', subLabel: 'midrange' },
-      { id: 'd5', label: 'Wraith', subLabel: 'distance' },
-      { id: 'd6', label: 'Aviar', subLabel: 'putter' },
+    type: 'named',
+    options: [
+      { id: 'd1', label: 'Destroyer' },
+      { id: 'd2', label: 'Buzzz' },
+      { id: 'd3', label: 'Luna' },
+      { id: 'd4', label: 'Roc3' },
+      { id: 'd5', label: 'Wraith' },
+      { id: 'd6', label: 'Aviar' },
     ],
   },
   {
@@ -52,8 +52,8 @@ const DEMO_BEFORE: Param[] = [
     max: 10,
     step: 1,
     majorStep: 1,
-    lblMin: '1',
-    lblMax: '10',
+    lblMin: 'easy',
+    lblMax: 'hard',
   },
   {
     id: 'hyzer_i+nose_i',
@@ -69,6 +69,7 @@ const DEMO_BEFORE: Param[] = [
       majorStep: 1,
       lblMin: 'hyzer',
       lblMax: 'anhyzer',
+      displayFormat: 'hyzer',
     },
     axisY: {
       id: 'nose_i',
@@ -78,8 +79,9 @@ const DEMO_BEFORE: Param[] = [
       max: 5,
       step: 1,
       majorStep: 1,
-      lblMin: 'down',
-      lblMax: 'up',
+      lblMin: 'nose ↓',
+      lblMax: 'nose ↑',
+      displayFormat: 'nose',
     },
   },
 ];
@@ -97,8 +99,8 @@ const DEMO_AFTER: Param[] = [
       max: 10,
       step: 1,
       majorStep: 1,
-      lblMin: '1',
-      lblMax: '10',
+      lblMin: 'easy',
+      lblMax: 'hard',
     },
     axisY: {
       id: 'exec',
@@ -108,8 +110,8 @@ const DEMO_AFTER: Param[] = [
       max: 10,
       step: 1,
       majorStep: 1,
-      lblMin: '1',
-      lblMax: '10',
+      lblMin: 'shank',
+      lblMax: 'pured',
     },
   },
   {
@@ -152,15 +154,15 @@ const DEMO_AFTER: Param[] = [
     lblMax: 'pulled',
   },
   {
-    id: 'effort',
-    name: 'Effort',
+    id: 'form',
+    name: 'Form',
     type: 'scalar',
     min: -2,
     max: 2,
     step: 1,
     majorStep: 1,
-    lblMin: 'smooth',
-    lblMax: 'strenuous',
+    lblMin: 'strenuous',
+    lblMax: 'smooth',
   },
 ];
 

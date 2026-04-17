@@ -82,16 +82,18 @@ export function useEntryForm(
         case 'scalar': {
           const n = parseFloat(raw);
           if (isNaN(n)) return raw;
+          if (param.displayFormat === 'hyzer') {
+            return n === 0 ? 'flat' : n > 0 ? `${n}a` : `${Math.abs(n)}h`;
+          }
+          if (param.displayFormat === 'nose') {
+            return n === 0 ? '—' : n > 0 ? `${n}↑` : `${Math.abs(n)}↓`;
+          }
           const formatted = Number.isInteger(n) ? String(n) : n.toFixed(1);
           return param.unit ? `${formatted}${param.unit}` : formatted;
         }
         case 'named': {
           const opt = param.options.find((o) => o.id === raw);
           return opt ? opt.label : raw;
-        }
-        case 'disc': {
-          const disc = param.discs.find((d) => d.id === raw);
-          return disc ? disc.label : raw;
         }
         case 'grid2d': {
           const parts = raw.split(GRID2D_SEP);

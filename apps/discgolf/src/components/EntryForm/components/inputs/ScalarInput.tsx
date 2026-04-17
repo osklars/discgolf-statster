@@ -16,7 +16,8 @@ const HEIGHT = 52;
 const AXIS_Y = 22;
 const DOT_R = 7;
 const TICK_H_MAJOR = 8;
-const PAD_H = Spacing.lg;
+const PAD = Spacing.lg;
+const TRACK_SIZE = 200;
 const DOT_HIT_SLOP = 12;
 const TAP_THRESHOLD = 8;
 
@@ -35,25 +36,28 @@ export function ScalarInput({ param, value, onDragStart, onLiveUpdate, onCommit 
   const containerRef = useRef<View>(null);
   const pageOffsetX = useRef(0);
   const widthRef = useRef(300);
+  const trackX0Ref = useRef(0);
   const valueRef = useRef<number | undefined>(value);
   valueRef.current = value;
 
   // Tracks whether the current gesture started on the dot.
   const isDotDragRef = useRef(false);
 
-  const trackWidthFor = (w: number) => w - PAD_H * 2;
+  const trackWidthFor = (w: number) => Math.min(w - PAD * 2, TRACK_SIZE);
+  const trackX0For = (w: number) => (w - trackWidthFor(w)) / 2;
 
   const valueFromPageX = (pageX: number): number => {
     const relX = pageX - pageOffsetX.current;
     const tw = trackWidthFor(widthRef.current);
-    const raw = min + ((relX - PAD_H) / tw) * (max - min);
+    const tx0 = trackX0Ref.current;
+    const raw = min + ((relX - tx0) / tw) * (max - min);
     return snapToStep(raw, min, max, step);
   };
 
   const dotRelX = (): number => {
     const v = liveValueRef.current ?? valueRef.current;
     if (v === undefined) return -9999;
-    return PAD_H + ((v - min) / (max - min)) * trackWidthFor(widthRef.current);
+    return trackX0Ref.current + ((v - min) / (max - min)) * trackWidthFor(widthRef.current);
   };
 
   const panResponder = useRef(
@@ -112,12 +116,14 @@ export function ScalarInput({ param, value, onDragStart, onLiveUpdate, onCommit 
     containerRef.current?.measure((_x, _y, width, _h, pageX) => {
       pageOffsetX.current = pageX;
       widthRef.current = width;
+      trackX0Ref.current = trackX0For(width);
       setContainerWidth(width);
     });
   }, []);
 
   const trackWidth = trackWidthFor(containerWidth);
-  const xForValue = (v: number) => PAD_H + ((v - min) / (max - min)) * trackWidth;
+  const trackX0 = trackX0For(containerWidth);
+  const xForValue = (v: number) => trackX0 + ((v - min) / (max - min)) * trackWidth;
 
   const displayValue = liveValueRef.current !== null ? liveValueRef.current : value;
   const hasDot = displayValue !== undefined;
@@ -137,8 +143,8 @@ export function ScalarInput({ param, value, onDragStart, onLiveUpdate, onCommit 
     >
       <Svg width={containerWidth} height={HEIGHT}>
         <Line
-          x1={PAD_H} y1={AXIS_Y}
-          x2={PAD_H + trackWidth} y2={AXIS_Y}
+          x1={trackX0} y1={AXIS_Y}
+          x2={trackX0 + trackWidth} y2={AXIS_Y}
           stroke={Colors.separator} strokeWidth={1.5}
         />
         {ticks.map((v) => {
@@ -153,14 +159,14 @@ export function ScalarInput({ param, value, onDragStart, onLiveUpdate, onCommit 
           );
         })}
         <SvgText
-          x={PAD_H} y={AXIS_Y + TICK_H_MAJOR / 2 + 13}
-          fontSize={Typography.labelSm.fontSize} fill={Colors.textMuted} textAnchor="middle"
+          x={trackX0} y={AXIS_Y + TICK_H_MAJOR / 2 + 13}
+          fontSize={Typography.labelSm.fontSize} fill={Colors.textMuted} textAnchor="start"
         >
           {lblMin}
         </SvgText>
         <SvgText
-          x={PAD_H + trackWidth} y={AXIS_Y + TICK_H_MAJOR / 2 + 13}
-          fontSize={Typography.labelSm.fontSize} fill={Colors.textMuted} textAnchor="middle"
+          x={trackX0 + trackWidth} y={AXIS_Y + TICK_H_MAJOR / 2 + 13}
+          fontSize={Typography.labelSm.fontSize} fill={Colors.textMuted} textAnchor="end"
         >
           {lblMax}
         </SvgText>

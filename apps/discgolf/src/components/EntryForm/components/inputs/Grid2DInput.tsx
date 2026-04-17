@@ -201,10 +201,10 @@ export function Grid2DInput({ param, valueX, valueY, onDragStart, onLiveUpdate, 
           );
         })}
 
-        <SvgText x={plotX0} y={plotY0 + plotSize + 17} fontSize={Typography.labelSm.fontSize} fill={Colors.textMuted} textAnchor="middle">
+        <SvgText x={plotX0} y={plotY0 + plotSize + 17} fontSize={Typography.labelSm.fontSize} fill={Colors.textMuted} textAnchor="start">
           {axisX.lblMin}
         </SvgText>
-        <SvgText x={plotX0 + plotSize} y={plotY0 + plotSize + 17} fontSize={Typography.labelSm.fontSize} fill={Colors.textMuted} textAnchor="middle">
+        <SvgText x={plotX0 + plotSize} y={plotY0 + plotSize + 17} fontSize={Typography.labelSm.fontSize} fill={Colors.textMuted} textAnchor="end">
           {axisX.lblMax}
         </SvgText>
         <SvgText x={plotX0 - 6} y={plotY0 + 4} fontSize={Typography.labelSm.fontSize} fill={Colors.textMuted} textAnchor="end">
