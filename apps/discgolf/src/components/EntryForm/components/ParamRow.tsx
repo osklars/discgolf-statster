@@ -84,6 +84,15 @@ export function ParamRow({
     [onCommit],
   );
 
+  // Auto-close after picking a named / disc value
+  const handleAutoCloseCommit = useCallback(
+    (v: string) => {
+      onCommit(v);
+      onToggle();
+    },
+    [onCommit, onToggle],
+  );
+
   const renderInput = () => {
     switch (param.type) {
       case 'scalar': {
@@ -101,11 +110,23 @@ export function ParamRow({
       }
       case 'named': {
         const p = param as NamedParam;
-        return <PillPicker options={p.options} selectedId={value} onSelect={onCommit} />;
+        return (
+          <PillPicker
+            options={p.options}
+            selectedId={value}
+            onSelect={handleAutoCloseCommit}
+          />
+        );
       }
       case 'disc': {
         const p = param as DiscParam;
-        return <DiscPicker discs={p.discs} selectedId={value} onSelect={onCommit} />;
+        return (
+          <DiscPicker
+            discs={p.discs}
+            selectedId={value}
+            onSelect={handleAutoCloseCommit}
+          />
+        );
       }
       case 'grid2d': {
         const p = param as Grid2DParam;
@@ -128,46 +149,41 @@ export function ParamRow({
 
   return (
     <View style={styles.wrapper}>
-      {/*
-        Legend-style separator: the param name sits in a gap in the line.
-        Right side holds the current value, clear button, and chevron.
-      */}
+      {/* Legend-style separator: name in the line, controls on the right */}
       <View style={styles.legendRow}>
-        {/* Name — no left line nub, starts at the content margin */}
-        <TouchableOpacity onPress={onToggle} activeOpacity={0.6} style={styles.nameTap} hitSlop={HIT_SLOP}>
+        <TouchableOpacity
+          onPress={onToggle}
+          activeOpacity={0.6}
+          style={styles.nameTap}
+          hitSlop={HIT_SLOP}
+        >
           <Text style={styles.nameText} numberOfLines={1}>
             {param.name}
           </Text>
         </TouchableOpacity>
 
-        {/* Separator line filling the gap after the name */}
+        {/* Line filling the gap after the name */}
         <View style={styles.sepLine} />
 
-        {/* Value */}
         {isSet && (
           <Text style={styles.valueText} numberOfLines={1}>
             {headerDisplay}
           </Text>
         )}
 
-        {/* Clear button */}
         {isSet && (
           <TouchableOpacity style={styles.clearBtn} onPress={onClear} hitSlop={HIT_SLOP}>
             <Text style={styles.clearText}>×</Text>
           </TouchableOpacity>
         )}
 
-        {/* Chevron toggle */}
         <TouchableOpacity onPress={onToggle} style={styles.chevronBtn} hitSlop={HIT_SLOP}>
-          <Text style={[styles.chevron, isExpanded && styles.chevronUp]}>›</Text>
+          {/* Right = closed, Down = open */}
+          <Text style={[styles.chevron, isExpanded && styles.chevronOpen]}>›</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Collapsible body — input starts immediately below the legend line */}
       {isExpanded && <View style={styles.body}>{renderInput()}</View>}
-
-      {/* Bottom separator */}
-      <View style={styles.bottomSep} />
     </View>
   );
 }
@@ -184,7 +200,6 @@ const styles = StyleSheet.create({
     minHeight: 28,
   },
   nameTap: {
-    // Just enough padding to make tap target reasonable, no extra height
     paddingVertical: Spacing.xs,
   },
   nameText: {
@@ -229,17 +244,13 @@ const styles = StyleSheet.create({
   chevron: {
     fontSize: 18,
     color: Colors.textDisabled,
-    transform: [{ rotate: '90deg' }],
+    // Default: points right → closed
+    transform: [{ rotate: '0deg' }],
     lineHeight: 20,
   },
-  chevronUp: {
-    transform: [{ rotate: '270deg' }],
+  chevronOpen: {
+    // Points down → open
+    transform: [{ rotate: '90deg' }],
   },
-  body: {
-    // No extra padding — inputs handle their own horizontal spacing
-  },
-  bottomSep: {
-    height: hairline,
-    backgroundColor: Colors.separator,
-  },
+  body: {},
 });

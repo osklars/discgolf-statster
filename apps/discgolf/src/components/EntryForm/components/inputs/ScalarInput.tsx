@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { PanResponder, StyleSheet, View } from 'react-native';
+import { PanResponder, Pressable, StyleSheet, View } from 'react-native';
 import { Circle, Line, Svg, Text as SvgText } from 'react-native-svg';
 import { Colors, Spacing, Typography } from '../../../../constants/theme';
 import type { ScalarParam } from '../../types';
@@ -30,16 +30,20 @@ export function ScalarInput({ param, value, onDragStart, onLiveUpdate, onCommit 
   const liveValueRef = useRef<number | null>(null);
   const [, forceUpdate] = useState(0);
 
-  // Measured page-level offset of the container — stays current via refs
-  // so the PanResponder closure (created once) always reads the right value.
+  // Whether the user has tapped to activate drag mode.
+  // Resets to false on unmount (i.e. when the row collapses).
+  const isActiveRef = useRef(false);
+  const [isActive, setIsActive] = useState(false);
+
   const containerRef = useRef<View>(null);
   const pageOffsetX = useRef(0);
   const widthRef = useRef(300);
 
   const trackWidthFor = (w: number) => w - PAD_H * 2;
 
-  // Convert an absolute screen x to a snapped param value.
-  const valueForPageX = (pageX: number): number => {
+  // Convert absolute screen X → snapped param value.
+  // Reads refs so always current even from PanResponder closures.
+  const valueFromPageX = (pageX: number): number => {
     const relX = pageX - pageOffsetX.current;
     const tw = trackWidthFor(widthRef.current);
     const raw = min + ((relX - PAD_H) / tw) * (max - min);
@@ -48,23 +52,23 @@ export function ScalarInput({ param, value, onDragStart, onLiveUpdate, onCommit 
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => isActiveRef.current,
+      onMoveShouldSetPanResponder: () => isActiveRef.current,
       onPanResponderGrant: (evt) => {
         onDragStart();
-        const v = valueForPageX(evt.nativeEvent.pageX);
+        const v = valueFromPageX(evt.nativeEvent.pageX);
         liveValueRef.current = v;
         forceUpdate((n) => n + 1);
         onLiveUpdate(v);
       },
       onPanResponderMove: (evt) => {
-        const v = valueForPageX(evt.nativeEvent.pageX);
+        const v = valueFromPageX(evt.nativeEvent.pageX);
         liveValueRef.current = v;
         forceUpdate((n) => n + 1);
         onLiveUpdate(v);
       },
       onPanResponderRelease: (evt) => {
-        const v = valueForPageX(evt.nativeEvent.pageX);
+        const v = valueFromPageX(evt.nativeEvent.pageX);
         liveValueRef.current = null;
         forceUpdate((n) => n + 1);
         onCommit(v);
@@ -85,7 +89,6 @@ export function ScalarInput({ param, value, onDragStart, onLiveUpdate, onCommit 
   }, []);
 
   const trackWidth = trackWidthFor(containerWidth);
-
   const xForValue = (v: number) => PAD_H + ((v - min) / (max - min)) * trackWidth;
 
   const displayValue = liveValueRef.current !== null ? liveValueRef.current : value;
@@ -98,7 +101,12 @@ export function ScalarInput({ param, value, onDragStart, onLiveUpdate, onCommit 
   }
 
   return (
-    <View ref={containerRef} style={styles.container} onLayout={onLayout} {...panResponder.panHandlers}>
+    <View
+      ref={containerRef}
+      style={styles.container}
+      onLayout={onLayout}
+      {...panResponder.panHandlers}
+    >
       <Svg width={containerWidth} height={HEIGHT}>
         {/* Axis line */}
         <Line
@@ -122,21 +130,41 @@ export function ScalarInput({ param, value, onDragStart, onLiveUpdate, onCommit 
 
         {/* End labels */}
         <SvgText
-          x={PAD_H} y={AXIS_Y + TICK_H_MAJOR / 2 + 14}
+          x={PAD_H} y={AXIS_Y + TICK_H_MAJOR / 2 + 13}
           fontSize={Typography.labelSm.fontSize} fill={Colors.textMuted} textAnchor="middle"
         >
           {lblMin}
         </SvgText>
         <SvgText
-          x={PAD_H + trackWidth} y={AXIS_Y + TICK_H_MAJOR / 2 + 14}
+          x={PAD_H + trackWidth} y={AXIS_Y + TICK_H_MAJOR / 2 + 13}
           fontSize={Typography.labelSm.fontSize} fill={Colors.textMuted} textAnchor="middle"
         >
           {lblMax}
         </SvgText>
 
-        {/* Dot */}
+        {/* Dot — shown when a value is set or being dragged */}
         {hasDot && <Circle cx={dotX} cy={AXIS_Y} r={DOT_R} fill={Colors.primary} />}
+
+        {/* Subtle ring on the dot when active to signal drag-ready */}
+        {hasDot && isActive && (
+          <Circle cx={dotX} cy={AXIS_Y} r={DOT_R + 4} fill="none" stroke={Colors.primaryBorder} strokeWidth={1} strokeOpacity={0.4} />
+        )}
       </Svg>
+
+      {/* Inactive overlay — captures tap to activate, doesn't block scroll */}
+      {!isActive && (
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={(evt) => {
+            isActiveRef.current = true;
+            setIsActive(true);
+            const v = valueFromPageX(evt.nativeEvent.pageX);
+            liveValueRef.current = null;
+            forceUpdate((n) => n + 1);
+            onCommit(v);
+          }}
+        />
+      )}
     </View>
   );
 }
