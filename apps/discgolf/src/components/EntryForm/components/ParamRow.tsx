@@ -7,9 +7,12 @@ import {
   Typography,
   hairline,
 } from '../../../constants/theme';
-import type { NamedParam, Param, ParamValue, ScalarParam } from '../types';
+import type { Grid2DParam, NamedParam, Param, ParamValue, ScalarParam } from '../types';
+import { Grid2DInput } from './inputs/Grid2DInput';
 import { PillPicker } from './inputs/PillPicker';
 import { ScalarInput } from './inputs/ScalarInput';
+
+const GRID2D_SEP = '·';
 
 interface Props {
   param: Param;
@@ -53,6 +56,31 @@ export function ParamRow({
     [onCommit],
   );
 
+  const handleGrid2DLive = useCallback(
+    (x: number, y: number) => {
+      const p = param as Grid2DParam;
+      const fmtAxis = (v: number, axis: ScalarParam): string => {
+        if (axis.displayFormat === 'hyzer') {
+          return v === 0 ? 'flat' : v > 0 ? `${v}a` : `${Math.abs(v)}h`;
+        }
+        if (axis.displayFormat === 'nose') {
+          return v === 0 ? '—' : v > 0 ? `${v}↑` : `${Math.abs(v)}↓`;
+        }
+        return axis.unit ? `${v}${axis.unit}` : String(v);
+      };
+      setLiveDisplay(`${fmtAxis(x, p.axisX)} × ${fmtAxis(y, p.axisY)}`);
+    },
+    [param],
+  );
+
+  const handleGrid2DCommit = useCallback(
+    (x: number, y: number) => {
+      setLiveDisplay(null);
+      onCommit(`${x}${GRID2D_SEP}${y}`);
+    },
+    [onCommit],
+  );
+
   const handleAutoCloseCommit = useCallback(
     (v: string) => {
       onCommit(v);
@@ -65,11 +93,11 @@ export function ParamRow({
     switch (param.type) {
       case 'scalar': {
         const p = param as ScalarParam;
-        const num = value !== undefined ? parseFloat(value) : undefined;
+        const n = value !== undefined ? parseFloat(value) : undefined;
         return (
           <ScalarInput
             param={p}
-            value={num !== undefined && !isNaN(num) ? num : undefined}
+            value={n !== undefined && !isNaN(n) ? n : undefined}
             onDragStart={onDragStart}
             onLiveUpdate={handleScalarLive}
             onCommit={handleScalarCommit}
@@ -79,10 +107,22 @@ export function ParamRow({
       case 'named': {
         const p = param as NamedParam;
         return (
-          <PillPicker
-            options={p.options}
-            selectedId={value}
-            onSelect={handleAutoCloseCommit}
+          <PillPicker options={p.options} selectedId={value} onSelect={handleAutoCloseCommit} />
+        );
+      }
+      case 'grid2d': {
+        const p = param as Grid2DParam;
+        const parts = value ? value.split(GRID2D_SEP) : [];
+        const xNum = parts[0] !== undefined ? parseFloat(parts[0]) : undefined;
+        const yNum = parts[1] !== undefined ? parseFloat(parts[1]) : undefined;
+        return (
+          <Grid2DInput
+            param={p}
+            valueX={xNum !== undefined && !isNaN(xNum) ? xNum : undefined}
+            valueY={yNum !== undefined && !isNaN(yNum) ? yNum : undefined}
+            onDragStart={onDragStart}
+            onLiveUpdate={handleGrid2DLive}
+            onCommit={handleGrid2DCommit}
           />
         );
       }

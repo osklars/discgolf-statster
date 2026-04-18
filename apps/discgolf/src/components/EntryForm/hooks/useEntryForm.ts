@@ -1,5 +1,11 @@
 import { useCallback, useState } from 'react';
-import type { EntryFormState, Param, ParamValue } from '../types';
+import type { EntryFormState, Grid2DParam, Param, ParamValue } from '../types';
+
+const GRID2D_SEP = '·';
+
+function isGrid2D(p: Param): p is Grid2DParam {
+  return p.type === 'grid2d';
+}
 
 export function useEntryForm(params: Param[]): EntryFormState & {
   toggleExpanded: (id: string) => void;
@@ -24,22 +30,43 @@ export function useEntryForm(params: Param[]): EntryFormState & {
     });
   }, []);
 
-  const setValue = useCallback((id: string, value: ParamValue) => {
-    setValues((prev) => ({ ...prev, [id]: value }));
-  }, []);
+  const setValue = useCallback(
+    (id: string, value: ParamValue) => {
+      setValues((prev) => {
+        const next = { ...prev, [id]: value };
+        const param = params.find((p) => p.id === id);
+        if (param && isGrid2D(param)) {
+          const parts = value.split(GRID2D_SEP);
+          if (parts.length === 2) {
+            next[param.axisX.id] = parts[0];
+            next[param.axisY.id] = parts[1];
+          }
+        }
+        return next;
+      });
+    },
+    [params],
+  );
 
-  const clearValue = useCallback((id: string) => {
-    setValues((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-  }, []);
+  const clearValue = useCallback(
+    (id: string) => {
+      setValues((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        const param = params.find((p) => p.id === id);
+        if (param && isGrid2D(param)) {
+          delete next[param.axisX.id];
+          delete next[param.axisY.id];
+        }
+        return next;
+      });
+    },
+    [params],
+  );
 
   const formatValue = useCallback(
     (param: Param, raw: ParamValue | undefined): string => {
       if (raw === undefined || raw === '') return '';
-
       switch (param.type) {
         case 'scalar': {
           const n = parseFloat(raw);
@@ -56,6 +83,11 @@ export function useEntryForm(params: Param[]): EntryFormState & {
         case 'named': {
           const opt = param.options.find((o) => o.id === raw);
           return opt ? opt.label : raw;
+        }
+        case 'grid2d': {
+          const parts = raw.split(GRID2D_SEP);
+          if (parts.length !== 2) return raw;
+          return `${formatValue(param.axisX, parts[0])} × ${formatValue(param.axisY, parts[1])}`;
         }
       }
     },
