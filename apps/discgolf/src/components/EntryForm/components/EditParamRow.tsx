@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { Colors, HIT_SLOP, Spacing, Typography, hairline } from '../../../constants/theme';
 import type { Param } from '../types';
 
@@ -72,7 +73,7 @@ export function EditParamRow({
 
       {/* Settings */}
       <TouchableOpacity onPress={onOpenSettings} hitSlop={HIT_SLOP} style={styles.settingsBtn}>
-        <Text style={styles.settingsIcon}>✏</Text>
+        <Feather name="edit-2" size={16} color={Colors.textMuted} />
       </TouchableOpacity>
 
       {/* Drag handle — rightmost */}
@@ -149,10 +150,6 @@ const styles = StyleSheet.create({
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  settingsIcon: {
-    fontSize: 15,
-    color: Colors.textMuted,
   },
   dragHandle: {
     width: 44,
