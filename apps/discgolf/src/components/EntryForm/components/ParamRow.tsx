@@ -40,10 +40,9 @@ export function ParamRow({
 
   const handleScalarLive = useCallback(
     (v: number) => {
-      const p = param as ScalarParam;
-      setLiveDisplay(p.unit ? `${v}${p.unit}` : String(v));
+      setLiveDisplay(formatValue(param, String(v)));
     },
-    [param],
+    [param, formatValue],
   );
 
   const handleScalarCommit = useCallback(
