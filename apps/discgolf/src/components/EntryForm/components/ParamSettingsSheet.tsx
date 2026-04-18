@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import {
   Colors,
   MIN_HIT,
@@ -287,7 +288,7 @@ function Grid2DEditContent({
           >
             <Text style={ss.axisChipLabel}>X</Text>
             <Text style={ss.axisChipName}>{axisX.name}</Text>
-            <Text style={ss.axisChipEdit}>✏</Text>
+            <Feather name="edit-2" size={12} color={Colors.textMuted} />
           </TouchableOpacity>
           <TouchableOpacity style={ss.swapBtn} onPress={handleSwap} activeOpacity={0.7}>
             <Text style={ss.swapIcon}>⇄</Text>
@@ -300,7 +301,7 @@ function Grid2DEditContent({
           >
             <Text style={ss.axisChipLabel}>Y</Text>
             <Text style={ss.axisChipName}>{axisY.name}</Text>
-            <Text style={ss.axisChipEdit}>✏</Text>
+            <Feather name="edit-2" size={12} color={Colors.textMuted} />
           </TouchableOpacity>
         </View>
 
@@ -670,10 +671,6 @@ const ss = StyleSheet.create({
     ...Typography.label,
     color: Colors.text,
     flexShrink: 1,
-  },
-  axisChipEdit: {
-    fontSize: 13,
-    color: Colors.textMuted,
   },
   swapBtn: {
     alignItems: 'center',

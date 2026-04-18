@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { Colors, Spacing, Typography, hairline } from '../../../constants/theme';
 
 interface Props {
@@ -14,7 +15,7 @@ export function FormHeader({ name, isEditMode, onEditPress }: Props) {
       <Text style={styles.name}>{name}</Text>
       {!isEditMode && (
         <TouchableOpacity onPress={onEditPress} activeOpacity={0.6} style={styles.editBtn}>
-          <Text style={styles.editLabel}>Edit</Text>
+          <Feather name="edit-2" size={18} color={Colors.primary} />
         </TouchableOpacity>
       )}
     </View>
@@ -39,9 +40,5 @@ const styles = StyleSheet.create({
   editBtn: {
     paddingVertical: Spacing.xs,
     paddingLeft: Spacing.md,
-  },
-  editLabel: {
-    ...Typography.body,
-    color: Colors.primary,
   },
 });
