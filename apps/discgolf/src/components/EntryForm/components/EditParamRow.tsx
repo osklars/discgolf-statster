@@ -72,7 +72,7 @@ export function EditParamRow({
 
       {/* Settings */}
       <TouchableOpacity onPress={onOpenSettings} hitSlop={HIT_SLOP} style={styles.settingsBtn}>
-        <Text style={styles.settingsIcon}>⚙</Text>
+        <Text style={styles.settingsIcon}>✏</Text>
       </TouchableOpacity>
 
       {/* Drag handle — rightmost */}
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   settingsIcon: {
-    fontSize: 16,
+    fontSize: 15,
     color: Colors.textMuted,
   },
   dragHandle: {

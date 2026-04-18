@@ -177,7 +177,7 @@ function ScalarAxisFields({
   );
 }
 
-// ─── Grid2D edit view (rename / swap axes / disband) ─────────────────────────
+// ─── Grid2D edit view (rename / swap axes / disband / edit axes) ─────────────
 
 function Grid2DEditContent({
   initial,
@@ -191,21 +191,74 @@ function Grid2DEditContent({
   onClose: () => void;
 }) {
   const [title, setTitle] = useState(initial.name);
-  const [swapped, setSwapped] = useState(false);
+  const [axisX, setAxisX] = useState<ScalarParam>(initial.axisX);
+  const [axisY, setAxisY] = useState<ScalarParam>(initial.axisY);
+  const [editingAxis, setEditingAxis] = useState<'x' | 'y' | null>(null);
 
-  const axisX = swapped ? initial.axisY : initial.axisX;
-  const axisY = swapped ? initial.axisX : initial.axisY;
+  // Fields for the axis currently being edited
+  const [axisEditName, setAxisEditName] = useState('');
+  const [axisEditFields, setAxisEditFields] = useState<ScalarFields>(defaultScalarFields());
+
+  const openAxisEdit = (which: 'x' | 'y') => {
+    const axis = which === 'x' ? axisX : axisY;
+    setAxisEditName(axis.name);
+    setAxisEditFields(scalarToFields(axis));
+    setEditingAxis(which);
+  };
+
+  const saveAxisEdit = () => {
+    const axis = editingAxis === 'x' ? axisX : axisY;
+    const updated = buildScalar(axis.id, { ...axisEditFields, name: axisEditName });
+    if (editingAxis === 'x') setAxisX(updated);
+    else setAxisY(updated);
+    setEditingAxis(null);
+  };
+
+  const handleSwap = () => {
+    setAxisX(axisY);
+    setAxisY(axisX);
+  };
 
   const handleSave = () => {
-    const updated: Grid2DParam = {
+    onSave({
       ...initial,
       name: title || `${axisX.name} × ${axisY.name}`,
       axisX,
       axisY,
-    };
-    onSave(updated);
+    });
   };
 
+  // ── Axis edit sub-view ──────────────────────────────────────────────────────
+  if (editingAxis) {
+    return (
+      <View style={ss.sheet}>
+        <View style={ss.header}>
+          <TouchableOpacity onPress={() => setEditingAxis(null)} style={ss.headerBtn} activeOpacity={0.7}>
+            <Text style={ss.cancelText}>‹ Back</Text>
+          </TouchableOpacity>
+          <Text style={ss.headerTitle}>
+            {editingAxis === 'x' ? 'X' : 'Y'} Axis
+          </Text>
+          <TouchableOpacity onPress={saveAxisEdit} style={ss.headerBtn} activeOpacity={0.7}>
+            <Text style={ss.saveText}>Done</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView
+          style={ss.scroll}
+          contentContainerStyle={ss.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Field label="Name" value={axisEditName} onChangeText={setAxisEditName} />
+          <ScalarAxisFields
+            fields={axisEditFields}
+            onChange={(patch) => setAxisEditFields((prev) => ({ ...prev, ...patch }))}
+          />
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ── Summary view ────────────────────────────────────────────────────────────
   return (
     <View style={ss.sheet}>
       <View style={ss.header}>
@@ -219,21 +272,36 @@ function Grid2DEditContent({
       </View>
 
       <ScrollView style={ss.scroll} contentContainerStyle={ss.scrollContent} keyboardShouldPersistTaps="handled">
-        <Field label="Title" value={title} onChangeText={setTitle} placeholder={`${axisX.name} × ${axisY.name}`} />
+        <Field
+          label="Title"
+          value={title}
+          onChangeText={setTitle}
+          placeholder={`${axisX.name} × ${axisY.name}`}
+        />
 
         <View style={ss.axisPreview}>
-          <View style={ss.axisChip}>
+          <TouchableOpacity
+            style={ss.axisChip}
+            onPress={() => openAxisEdit('x')}
+            activeOpacity={0.7}
+          >
             <Text style={ss.axisChipLabel}>X</Text>
             <Text style={ss.axisChipName}>{axisX.name}</Text>
-          </View>
-          <TouchableOpacity style={ss.swapBtn} onPress={() => setSwapped((s) => !s)} activeOpacity={0.7}>
+            <Text style={ss.axisChipEdit}>✏</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={ss.swapBtn} onPress={handleSwap} activeOpacity={0.7}>
             <Text style={ss.swapIcon}>⇄</Text>
             <Text style={ss.swapLabel}>Swap</Text>
           </TouchableOpacity>
-          <View style={ss.axisChip}>
+          <TouchableOpacity
+            style={ss.axisChip}
+            onPress={() => openAxisEdit('y')}
+            activeOpacity={0.7}
+          >
             <Text style={ss.axisChipLabel}>Y</Text>
             <Text style={ss.axisChipName}>{axisY.name}</Text>
-          </View>
+            <Text style={ss.axisChipEdit}>✏</Text>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity style={ss.disbandBtn} onPress={onDisband} activeOpacity={0.7}>
@@ -602,6 +670,10 @@ const ss = StyleSheet.create({
     ...Typography.label,
     color: Colors.text,
     flexShrink: 1,
+  },
+  axisChipEdit: {
+    fontSize: 13,
+    color: Colors.textMuted,
   },
   swapBtn: {
     alignItems: 'center',

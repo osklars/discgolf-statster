@@ -1,13 +1,14 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Colors, Spacing, Typography } from '../../constants/theme';
-import type { FormDefinition, Param } from './types';
+import type { FormDefinition, NamedParam, Param, ScalarParam } from './types';
 import { ParamRow } from './components/ParamRow';
 import { StickyBar } from './components/StickyBar';
 import { FormHeader } from './components/FormHeader';
 import { EditParamRow } from './components/EditParamRow';
 import { EditModeBar } from './components/EditModeBar';
 import { ParamSettingsSheet } from './components/ParamSettingsSheet';
+import { AddParamSheet } from './components/AddParamSheet';
 import { useEntryForm } from './hooks/useEntryForm';
 import { useEditForm } from './hooks/useEditForm';
 
@@ -147,12 +148,42 @@ const PRACTICE_ROUND: FormDefinition = {
 
 const DEMO_HOLE = { holeNumber: 4, distanceM: 152, par: 3, throwNumber: 2 };
 
+// ─── Library helpers ──────────────────────────────────────────────────────────
+
+function extractLibraryParams(params: Param[]): (ScalarParam | NamedParam)[] {
+  const result: (ScalarParam | NamedParam)[] = [];
+  for (const p of params) {
+    if (p.type === 'grid2d') {
+      result.push(p.axisX, p.axisY);
+    } else {
+      result.push(p as ScalarParam | NamedParam);
+    }
+  }
+  return result;
+}
+
+function getParamIdsInDraft(draft: Param[]): Set<string> {
+  const ids = new Set<string>();
+  for (const p of draft) {
+    if (p.type === 'grid2d') {
+      ids.add(p.axisX.id);
+      ids.add(p.axisY.id);
+    } else {
+      ids.add(p.id);
+    }
+  }
+  return ids;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function EntryForm() {
   const [formDefs, setFormDefs] = useState<FormDefinition[]>([PRACTICE_ROUND]);
   const [activeId, setActiveId] = useState(PRACTICE_ROUND.id);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [paramLibrary, setParamLibrary] = useState<(ScalarParam | NamedParam)[]>(() =>
+    extractLibraryParams(PRACTICE_ROUND.params),
+  );
   // Increment to force-remount the edit form and reset its state
   const [editKey, setEditKey] = useState(0);
 
@@ -222,6 +253,12 @@ export function EntryForm() {
         <EditModeContent
           key={editKey}
           formDef={activeDef}
+          paramLibrary={paramLibrary}
+          onAddToLibrary={(param) =>
+            setParamLibrary((prev) =>
+              prev.some((p) => p.id === param.id) ? prev : [...prev, param],
+            )
+          }
           onOverwrite={handleOverwrite}
           onSaveAsNew={handleSaveAsNew}
           onCancel={() => setIsEditMode(false)}
@@ -271,13 +308,23 @@ type DragState = {
 
 interface EditModeProps {
   formDef: FormDefinition;
+  paramLibrary: (ScalarParam | NamedParam)[];
+  onAddToLibrary: (param: ScalarParam | NamedParam) => void;
   onOverwrite: (draft: Param[]) => void;
   onSaveAsNew: (draft: Param[]) => void;
   onCancel: () => void;
 }
 
-function EditModeContent({ formDef, onOverwrite, onSaveAsNew, onCancel }: EditModeProps) {
+function EditModeContent({
+  formDef,
+  paramLibrary,
+  onAddToLibrary,
+  onOverwrite,
+  onSaveAsNew,
+  onCancel,
+}: EditModeProps) {
   const edit = useEditForm(formDef);
+  const [showAddSheet, setShowAddSheet] = useState(false);
 
   // ── Drag state ─────────────────────────────────────────────────────────────
   const [drag, setDragState] = useState<DragState | null>(null);
@@ -442,7 +489,11 @@ function EditModeContent({ formDef, onOverwrite, onSaveAsNew, onCancel }: EditMo
             );
           })}
 
-          <TouchableOpacity style={styles.addParamBtn} onPress={edit.openAddNew} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.addParamBtn}
+            onPress={() => setShowAddSheet(true)}
+            activeOpacity={0.7}
+          >
             <Text style={styles.addParamText}>+ Add param</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -469,12 +520,33 @@ function EditModeContent({ formDef, onOverwrite, onSaveAsNew, onCancel }: EditMo
       <ParamSettingsSheet
         visible={sheetVisible}
         initial={sheetTarget}
-        onSave={edit.saveParam}
+        onSave={(param) => {
+          const isNewParam = edit.settingsTarget === 'new';
+          edit.saveParam(param);
+          if (isNewParam && (param.type === 'scalar' || param.type === 'named')) {
+            onAddToLibrary(param as ScalarParam | NamedParam);
+          }
+        }}
         onDisband={() => {
           if (sheetTarget?.type === 'grid2d') edit.splitGrid2D(sheetTarget.id);
           edit.closeSettings();
         }}
         onClose={edit.closeSettings}
+      />
+
+      {/* Computed available params: in library but not already in draft */}
+      <AddParamSheet
+        visible={showAddSheet}
+        available={paramLibrary.filter((p) => !getParamIdsInDraft(edit.draft).has(p.id))}
+        onAdd={(param) => {
+          edit.saveParam(param);
+          setShowAddSheet(false);
+        }}
+        onCreateNew={() => {
+          setShowAddSheet(false);
+          edit.openAddNew();
+        }}
+        onClose={() => setShowAddSheet(false)}
       />
     </View>
   );
