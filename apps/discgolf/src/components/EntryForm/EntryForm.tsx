@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Colors, Spacing, Typography } from '../../constants/theme';
+import { Colors, Radius, Spacing, Typography, hairline } from '../../constants/theme';
 import type { FormDefinition, NamedParam, Param, ScalarParam } from './types';
 import { ParamRow } from './components/ParamRow';
 import { StickyBar } from './components/StickyBar';
@@ -246,6 +246,10 @@ export function EntryForm() {
   return (
     <View style={styles.root}>
       <FormHeader name={activeDef.name} isEditMode={isEditMode} onEditPress={enterEdit} />
+
+      {!isEditMode && (
+        <FormTabs defs={formDefs} activeId={activeId} onSelect={setActiveId} />
+      )}
 
       {isEditMode ? (
         <EditModeContent
@@ -550,6 +554,43 @@ function EditModeContent({
   );
 }
 
+// ─── Form layout tab strip ────────────────────────────────────────────────────
+
+interface FormTabsProps {
+  defs: FormDefinition[];
+  activeId: string;
+  onSelect: (id: string) => void;
+}
+
+function FormTabs({ defs, activeId, onSelect }: FormTabsProps) {
+  if (defs.length < 2) return null;
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.formTabsScroll}
+      contentContainerStyle={styles.formTabsContent}
+      keyboardShouldPersistTaps="handled"
+    >
+      {defs.map((def) => {
+        const active = def.id === activeId;
+        return (
+          <TouchableOpacity
+            key={def.id}
+            onPress={() => onSelect(def.id)}
+            activeOpacity={0.7}
+            style={[styles.formTab, active && styles.formTabActive]}
+          >
+            <Text style={[styles.formTabText, active && styles.formTabTextActive]}>
+              {def.name}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -575,6 +616,33 @@ const styles = StyleSheet.create({
     ...Typography.body,
     color: Colors.primary,
     fontWeight: '600',
+  },
+  formTabsScroll: {
+    flexGrow: 0,
+    borderBottomWidth: hairline,
+    borderBottomColor: Colors.separator,
+  },
+  formTabsContent: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  formTab: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.surface,
+  },
+  formTabActive: {
+    backgroundColor: Colors.primary,
+  },
+  formTabText: {
+    ...Typography.label,
+    color: Colors.textMuted,
+    fontWeight: '600',
+  },
+  formTabTextActive: {
+    color: '#fff',
   },
   ghost: {
     position: 'absolute',

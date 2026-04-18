@@ -1,19 +1,15 @@
+import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView, StyleSheet } from 'react-native';
-import { EntryForm } from './src/components/EntryForm';
+import { AppNavigator } from './src/navigation/AppNavigator';
 
 export default function App() {
   return (
-    <SafeAreaView style={styles.root}>
-      <StatusBar style="dark" />
-      <EntryForm />
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <StatusBar style="dark" />
+        <AppNavigator />
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-});
