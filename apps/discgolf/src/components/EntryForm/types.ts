@@ -19,23 +19,13 @@ export type NamedParam = {
   options: { id: string; label: string }[];
 };
 
-export type Grid2DParam = {
-  id: string;
-  name: string;
-  type: 'grid2d';
-  axisX: ScalarParam;
-  axisY: ScalarParam;
-};
+export type Param = ScalarParam | NamedParam;
 
-export type Param = ScalarParam | NamedParam | Grid2DParam;
-
-// always a string: scalar → "85", named/disc → optionId, grid2d → "85·3"
+// always a string: scalar → "85", named/disc → optionId
 export type ParamValue = string;
 
 export type EntryFormState = {
-  activeTab: 'before' | 'after';
   expandedIds: Set<string>;
   values: Record<string, ParamValue>;
-  beforeParams: Param[];
-  afterParams: Param[];
+  params: Param[];
 };

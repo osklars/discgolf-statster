@@ -17,14 +17,12 @@ interface HoleContext {
 }
 
 interface Props {
-  activeTab: 'before' | 'after';
   holeContext: HoleContext;
   onAction: () => void;
 }
 
-export function StickyBar({ activeTab, holeContext, onAction }: Props) {
+export function StickyBar({ holeContext, onAction }: Props) {
   const { holeNumber, distanceM, par, throwNumber } = holeContext;
-  const label = activeTab === 'before' ? 'Throw →' : 'Log throw';
 
   return (
     <View style={styles.container}>
@@ -36,7 +34,7 @@ export function StickyBar({ activeTab, holeContext, onAction }: Props) {
         onPress={onAction}
         activeOpacity={0.8}
       >
-        <Text style={styles.buttonLabel}>{label}</Text>
+        <Text style={styles.buttonLabel}>Log throw</Text>
       </TouchableOpacity>
     </View>
   );
