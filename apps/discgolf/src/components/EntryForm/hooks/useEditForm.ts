@@ -103,6 +103,18 @@ export function useEditForm(initial: FormDefinition) {
     setSettingsTarget(null);
   }, []);
 
+  const reorderTo = useCallback((id: string, toIndex: number) => {
+    setDraft((prev) => {
+      const fromIdx = prev.findIndex((p) => p.id === id);
+      if (fromIdx === -1 || toIndex === fromIdx || toIndex === fromIdx + 1) return prev;
+      const next = [...prev];
+      const [item] = next.splice(fromIdx, 1);
+      const insertAt = fromIdx < toIndex ? toIndex - 1 : toIndex;
+      next.splice(insertAt, 0, item);
+      return next;
+    });
+  }, []);
+
   const newParamTemplate = (): ScalarParam => ({
     id: uid(),
     name: '',
@@ -126,6 +138,7 @@ export function useEditForm(initial: FormDefinition) {
     startCombine,
     commitCombine,
     splitGrid2D,
+    reorderTo,
     openSettings,
     openAddNew,
     closeSettings,

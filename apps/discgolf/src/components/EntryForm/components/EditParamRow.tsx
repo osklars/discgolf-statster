@@ -1,22 +1,19 @@
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useRef } from 'react';
+import { PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Colors, HIT_SLOP, Spacing, Typography, hairline } from '../../../constants/theme';
-import type { CombinePending } from '../hooks/useEditForm';
 import type { Param } from '../types';
 
 interface Props {
   param: Param;
-  isFirst: boolean;
-  isLast: boolean;
-  combinePending: CombinePending;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
+  isDragging: boolean;
+  isCombineTarget: boolean;
+  combineSourceAsX: boolean; // true = left half (source→X) highlighted
   onRemove: () => void;
   onOpenSettings: () => void;
-  onStartCombine: () => void;
-  // Called on the TARGET row; sourceAsX=true means pending source → X, this row → Y
-  onCommitCombine: (sourceAsX: boolean) => void;
-  onSplit: () => void;
+  onLayout: (contentY: number, height: number) => void;
+  onDragHandleGrant: (pageY: number, pageX: number) => void;
+  onDragHandleMove: (pageY: number, pageX: number) => void;
+  onDragHandleRelease: () => void;
 }
 
 const TYPE_LABELS: Record<Param['type'], string> = {
@@ -27,87 +24,78 @@ const TYPE_LABELS: Record<Param['type'], string> = {
 
 export function EditParamRow({
   param,
-  isFirst,
-  isLast,
-  combinePending,
-  onMoveUp,
-  onMoveDown,
+  isDragging,
+  isCombineTarget,
+  combineSourceAsX,
   onRemove,
   onOpenSettings,
-  onStartCombine,
-  onCommitCombine,
-  onSplit,
+  onLayout,
+  onDragHandleGrant,
+  onDragHandleMove,
+  onDragHandleRelease,
 }: Props) {
-  const isPendingSource = combinePending?.sourceId === param.id;
-  const isCombineTarget =
-    combinePending !== null &&
-    combinePending.sourceId !== param.id &&
-    param.type === 'scalar';
+  // Keep latest callbacks in a ref so the PanResponder closure is never stale
+  const cbRef = useRef({ onDragHandleGrant, onDragHandleMove, onDragHandleRelease });
+  cbRef.current = { onDragHandleGrant, onDragHandleMove, onDragHandleRelease };
+
+  const dragPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onShouldBlockNativeResponder: () => true,
+      onPanResponderGrant: (e) =>
+        cbRef.current.onDragHandleGrant(e.nativeEvent.pageY, e.nativeEvent.pageX),
+      onPanResponderMove: (e) =>
+        cbRef.current.onDragHandleMove(e.nativeEvent.pageY, e.nativeEvent.pageX),
+      onPanResponderRelease: () => cbRef.current.onDragHandleRelease(),
+      onPanResponderTerminate: () => cbRef.current.onDragHandleRelease(),
+    }),
+  ).current;
 
   return (
-    <View style={styles.outer}>
-      <View style={[styles.row, isPendingSource && styles.rowPending]}>
-        {/* Reorder arrows */}
-        <View style={styles.arrows}>
-          <TouchableOpacity onPress={onMoveUp} disabled={isFirst} hitSlop={HIT_SLOP}>
-            <Text style={[styles.arrow, isFirst && styles.arrowDisabled]}>↑</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={onMoveDown} disabled={isLast} hitSlop={HIT_SLOP}>
-            <Text style={[styles.arrow, isLast && styles.arrowDisabled]}>↓</Text>
-          </TouchableOpacity>
-        </View>
+    <View
+      style={[styles.row, isDragging && styles.rowDragging]}
+      onLayout={(e) => onLayout(e.nativeEvent.layout.y, e.nativeEvent.layout.height)}
+    >
+      {/* Delete — leftmost */}
+      <TouchableOpacity onPress={onRemove} hitSlop={HIT_SLOP} style={styles.deleteBtn}>
+        <Text style={styles.deleteIcon}>×</Text>
+      </TouchableOpacity>
 
-        {/* Name + type badge */}
-        <View style={styles.nameArea}>
-          <Text style={styles.nameText} numberOfLines={1}>
-            {param.name}
-          </Text>
-          <Text style={styles.typeBadge}>{TYPE_LABELS[param.type]}</Text>
-        </View>
-
-        {/* Action buttons */}
-        <View style={styles.actions}>
-          {param.type === 'scalar' && (
-            <TouchableOpacity
-              onPress={onStartCombine}
-              hitSlop={HIT_SLOP}
-              style={[styles.actionBtn, isPendingSource && styles.actionBtnActive]}
-            >
-              <Text style={[styles.actionIcon, isPendingSource && styles.actionIconActive]}>⊕</Text>
-            </TouchableOpacity>
-          )}
-          {param.type === 'grid2d' && (
-            <TouchableOpacity onPress={onSplit} hitSlop={HIT_SLOP} style={styles.actionBtn}>
-              <Text style={styles.actionIcon}>⊖</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={onOpenSettings} hitSlop={HIT_SLOP} style={styles.actionBtn}>
-            <Text style={styles.actionIcon}>⚙</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={onRemove} hitSlop={HIT_SLOP} style={styles.actionBtn}>
-            <Text style={[styles.actionIcon, styles.removeIcon]}>×</Text>
-          </TouchableOpacity>
-        </View>
+      {/* Name + type badge */}
+      <View style={styles.nameArea}>
+        <Text style={styles.nameText} numberOfLines={1}>
+          {param.name}
+        </Text>
+        <Text style={styles.typeBadge}>{TYPE_LABELS[param.type]}</Text>
       </View>
 
-      {/* Combine drop zones — shown below when this row is a valid target */}
+      {/* Settings */}
+      <TouchableOpacity onPress={onOpenSettings} hitSlop={HIT_SLOP} style={styles.settingsBtn}>
+        <Text style={styles.settingsIcon}>⚙</Text>
+      </TouchableOpacity>
+
+      {/* Drag handle — rightmost */}
+      <View style={styles.dragHandle} {...dragPan.panHandlers}>
+        <Text style={styles.dragHandleIcon}>≡</Text>
+      </View>
+
+      {/* Combine overlay — only when this row is a valid drop target */}
       {isCombineTarget && (
-        <View style={styles.combineZones}>
-          <TouchableOpacity
-            style={styles.combineZone}
-            onPress={() => onCommitCombine(false)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.combineLabel}>← X-axis</Text>
-          </TouchableOpacity>
-          <View style={styles.combineDivider} />
-          <TouchableOpacity
-            style={styles.combineZone}
-            onPress={() => onCommitCombine(true)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.combineLabel}>Y-axis →</Text>
-          </TouchableOpacity>
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+          <View style={styles.combineOverlay}>
+            <View style={[styles.combineZone, combineSourceAsX && styles.combineZoneActive]}>
+              <Text style={[styles.combineLabel, combineSourceAsX && styles.combineLabelActive]}>
+                ← X
+              </Text>
+            </View>
+            <View style={styles.combineDivider} />
+            <View style={[styles.combineZone, !combineSourceAsX && styles.combineZoneActive]}>
+              <Text style={[styles.combineLabel, !combineSourceAsX && styles.combineLabelActive]}>
+                Y →
+              </Text>
+            </View>
+          </View>
         </View>
       )}
     </View>
@@ -115,42 +103,33 @@ export function EditParamRow({
 }
 
 const styles = StyleSheet.create({
-  outer: {
-    backgroundColor: Colors.background,
-    borderBottomWidth: hairline,
-    borderBottomColor: Colors.separator,
-  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: Spacing.sm,
-    paddingRight: Spacing.xs,
     minHeight: 48,
+    borderBottomWidth: hairline,
+    borderBottomColor: Colors.separator,
+    backgroundColor: Colors.background,
   },
-  rowPending: {
-    backgroundColor: Colors.primaryLight,
+  rowDragging: {
+    opacity: 0.35,
   },
-  arrows: {
-    flexDirection: 'column',
+  deleteBtn: {
+    width: 44,
+    height: 48,
     alignItems: 'center',
-    marginRight: Spacing.sm,
-    gap: 2,
+    justifyContent: 'center',
   },
-  arrow: {
-    fontSize: 15,
-    color: Colors.textMuted,
-    lineHeight: 18,
-    paddingHorizontal: 4,
-  },
-  arrowDisabled: {
-    color: Colors.textDisabled,
+  deleteIcon: {
+    fontSize: 20,
+    color: '#EF4444',
+    lineHeight: 24,
   },
   nameArea: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    marginRight: Spacing.sm,
   },
   nameText: {
     ...Typography.body,
@@ -165,51 +144,51 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  actionBtn: {
-    width: 36,
-    height: 36,
+  settingsBtn: {
+    width: 40,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  actionBtnActive: {
-    backgroundColor: Colors.primaryLight,
-    borderRadius: 18,
-  },
-  actionIcon: {
+  settingsIcon: {
     fontSize: 16,
     color: Colors.textMuted,
   },
-  actionIconActive: {
-    color: Colors.primary,
+  dragHandle: {
+    width: 44,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  removeIcon: {
-    color: '#EF4444',
-    fontSize: 20,
+  dragHandleIcon: {
+    fontSize: 18,
+    color: Colors.textDisabled,
+    letterSpacing: 1,
   },
-  combineZones: {
+  combineOverlay: {
+    flex: 1,
     flexDirection: 'row',
-    backgroundColor: Colors.primaryLight,
-    borderTopWidth: hairline,
-    borderTopColor: Colors.primaryBorder,
-    height: 36,
+    backgroundColor: 'rgba(12, 68, 124, 0.06)',
   },
   combineZone: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  combineZoneActive: {
+    backgroundColor: Colors.primaryLight,
+  },
   combineDivider: {
     width: hairline,
-    backgroundColor: Colors.primaryBorder,
     alignSelf: 'stretch',
+    backgroundColor: Colors.primaryBorder,
   },
   combineLabel: {
     ...Typography.label,
-    color: Colors.primary,
+    color: Colors.textMuted,
     fontWeight: '600',
+  },
+  combineLabelActive: {
+    color: Colors.primary,
   },
 });

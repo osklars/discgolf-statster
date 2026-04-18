@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, Text, View } from 'react-native';
+import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Colors, Spacing, Typography } from '../../constants/theme';
 import type { FormDefinition, Param } from './types';
 import { ParamRow } from './components/ParamRow';
@@ -261,6 +261,14 @@ export function EntryForm() {
 
 // ─── Edit mode sub-component ──────────────────────────────────────────────────
 
+type DragState = {
+  paramId: string;
+  pageY: number;  // current touch screen Y
+  pageX: number;  // current touch screen X
+  offsetY: number; // touch Y - row top screen Y (captured at drag start)
+  rowHeight: number;
+};
+
 interface EditModeProps {
   formDef: FormDefinition;
   onOverwrite: (draft: Param[]) => void;
@@ -271,36 +279,174 @@ interface EditModeProps {
 function EditModeContent({ formDef, onOverwrite, onSaveAsNew, onCancel }: EditModeProps) {
   const edit = useEditForm(formDef);
 
-  const sheetTarget =
-    edit.settingsTarget === 'new' ? null : (edit.settingsTarget ?? null);
+  // ── Drag state ─────────────────────────────────────────────────────────────
+  const [drag, setDragState] = useState<DragState | null>(null);
+  const dragRef = useRef<DragState | null>(null);
+  const setDrag = useCallback((d: DragState | null) => {
+    dragRef.current = d;
+    setDragState(d);
+  }, []);
+
+  // ── Layout tracking ────────────────────────────────────────────────────────
+  // content Y and height of each row (onLayout y = offset within ScrollView content)
+  const rowContentY = useRef<Map<string, number>>(new Map());
+  const rowHeights = useRef<Map<string, number>>(new Map());
+
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
+  const scrollContainerRef = useRef<View>(null);
+  const scrollContainerPageY = useRef(0);
+
+  const rootRef = useRef<View>(null);
+  const rootPageY = useRef(0);
+
+  // ── Drag handlers (kept in ref so PanResponder closures are never stale) ───
+  const editRef = useRef(edit);
+  editRef.current = edit;
+
+  const dragHandlers = useRef({
+    onGrant: (paramId: string, pageY: number, pageX: number) => {
+      const contentY = rowContentY.current.get(paramId) ?? 0;
+      const h = rowHeights.current.get(paramId) ?? 48;
+      const rowScreenY = scrollContainerPageY.current + contentY - scrollY.current;
+      const offsetY = pageY - rowScreenY;
+      scrollRef.current?.setNativeProps({ scrollEnabled: false });
+      dragRef.current = { paramId, pageY, pageX, offsetY, rowHeight: h };
+      setDragState({ paramId, pageY, pageX, offsetY, rowHeight: h });
+    },
+    onMove: (pageY: number, pageX: number) => {
+      if (!dragRef.current) return;
+      const next = { ...dragRef.current, pageY, pageX };
+      dragRef.current = next;
+      setDragState(next);
+    },
+    onRelease: () => {
+      const d = dragRef.current;
+      scrollRef.current?.setNativeProps({ scrollEnabled: true });
+      dragRef.current = null;
+      setDragState(null);
+      if (!d) return;
+
+      const e = editRef.current;
+      const overId = (() => {
+        for (const param of e.draft) {
+          if (param.id === d.paramId) continue;
+          const contentY = rowContentY.current.get(param.id);
+          const h = rowHeights.current.get(param.id);
+          if (contentY === undefined || h === undefined) continue;
+          const rowScreenY = scrollContainerPageY.current + contentY - scrollY.current;
+          if (d.pageY >= rowScreenY && d.pageY < rowScreenY + h) return param.id;
+        }
+        return null;
+      })();
+
+      if (overId) {
+        const dragParam = e.draft.find((p) => p.id === d.paramId);
+        const overParam = e.draft.find((p) => p.id === overId);
+        if (dragParam?.type === 'scalar' && overParam?.type === 'scalar') {
+          const screenWidth = Dimensions.get('window').width;
+          const sourceAsX = d.pageX < screenWidth / 2;
+          e.commitCombine(d.paramId, overId, sourceAsX);
+          return;
+        }
+      }
+
+      // Reorder
+      let insertIdx = 0;
+      for (let i = 0; i < e.draft.length; i++) {
+        if (e.draft[i].id === d.paramId) continue;
+        const contentY = rowContentY.current.get(e.draft[i].id);
+        const h = rowHeights.current.get(e.draft[i].id);
+        if (contentY === undefined || h === undefined) continue;
+        const rowScreenY = scrollContainerPageY.current + contentY - scrollY.current;
+        if (d.pageY > rowScreenY + h / 2) insertIdx = i + 1;
+      }
+      e.reorderTo(d.paramId, insertIdx);
+    },
+  });
+
+  // ── Derived drag info for rendering ───────────────────────────────────────
+  const overIdForRender = drag
+    ? (() => {
+        for (const param of edit.draft) {
+          if (param.id === drag.paramId) continue;
+          const contentY = rowContentY.current.get(param.id);
+          const h = rowHeights.current.get(param.id);
+          if (contentY === undefined || h === undefined) continue;
+          const rowScreenY = scrollContainerPageY.current + contentY - scrollY.current;
+          if (drag.pageY >= rowScreenY && drag.pageY < rowScreenY + h) return param.id;
+        }
+        return null;
+      })()
+    : null;
+
+  const dragParam = drag ? edit.draft.find((p) => p.id === drag.paramId) : null;
+  const screenWidth = Dimensions.get('window').width;
+  const combineSourceAsX = drag ? drag.pageX < screenWidth / 2 : false;
+
+  // Ghost top position relative to root View
+  const ghostTop = drag
+    ? drag.pageY - drag.offsetY - rootPageY.current
+    : 0;
+
+  // ── Settings sheet ─────────────────────────────────────────────────────────
+  const sheetTarget = edit.settingsTarget === 'new' ? null : (edit.settingsTarget ?? null);
   const sheetVisible = edit.settingsTarget !== null;
 
   return (
-    <>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        {edit.draft.map((param, idx) => (
-          <EditParamRow
-            key={param.id}
-            param={param}
-            isFirst={idx === 0}
-            isLast={idx === edit.draft.length - 1}
-            combinePending={edit.combinePending}
-            onMoveUp={() => edit.moveUp(param.id)}
-            onMoveDown={() => edit.moveDown(param.id)}
-            onRemove={() => edit.removeParam(param.id)}
-            onOpenSettings={() => edit.openSettings(param)}
-            onStartCombine={() => edit.startCombine(param.id)}
-            onCommitCombine={(sourceAsX) =>
-              edit.commitCombine(edit.combinePending!.sourceId, param.id, sourceAsX)
-            }
-            onSplit={() => edit.splitGrid2D(param.id)}
-          />
-        ))}
+    <View ref={rootRef} style={styles.editRoot} onLayout={() => {
+      rootRef.current?.measure((_x, _y, _w, _h, _px, py) => {
+        rootPageY.current = py;
+      });
+    }}>
+      {/* Scroll container — measure once for pageY */}
+      <View
+        ref={scrollContainerRef}
+        style={styles.scroll}
+        onLayout={() => {
+          scrollContainerRef.current?.measure((_x, _y, _w, _h, _px, py) => {
+            scrollContainerPageY.current = py;
+          });
+        }}
+      >
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.scrollContent}
+          scrollEventThrottle={16}
+          onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }}
+        >
+          {edit.draft.map((param) => {
+            const isCombineTarget =
+              overIdForRender === param.id &&
+              dragParam?.type === 'scalar' &&
+              param.type === 'scalar';
+            return (
+              <EditParamRow
+                key={param.id}
+                param={param}
+                isDragging={drag?.paramId === param.id}
+                isCombineTarget={isCombineTarget}
+                combineSourceAsX={combineSourceAsX}
+                onRemove={() => edit.removeParam(param.id)}
+                onOpenSettings={() => edit.openSettings(param)}
+                onLayout={(contentY, height) => {
+                  rowContentY.current.set(param.id, contentY);
+                  rowHeights.current.set(param.id, height);
+                }}
+                onDragHandleGrant={(pageY, pageX) =>
+                  dragHandlers.current.onGrant(param.id, pageY, pageX)
+                }
+                onDragHandleMove={dragHandlers.current.onMove}
+                onDragHandleRelease={dragHandlers.current.onRelease}
+              />
+            );
+          })}
 
-        <TouchableOpacity style={styles.addParamBtn} onPress={edit.openAddNew} activeOpacity={0.7}>
-          <Text style={styles.addParamText}>+ Add param</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          <TouchableOpacity style={styles.addParamBtn} onPress={edit.openAddNew} activeOpacity={0.7}>
+            <Text style={styles.addParamText}>+ Add param</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
 
       <EditModeBar
         onOverwrite={() => onOverwrite(edit.draft)}
@@ -308,13 +454,29 @@ function EditModeContent({ formDef, onOverwrite, onSaveAsNew, onCancel }: EditMo
         onCancel={onCancel}
       />
 
+      {/* Drag ghost — floats above everything, no pointer events */}
+      {drag && (
+        <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+          <View style={[styles.ghost, { top: ghostTop, height: drag.rowHeight }]}>
+            <Text style={styles.ghostText} numberOfLines={1}>
+              {dragParam?.name ?? ''}
+            </Text>
+            <Text style={styles.ghostHandle}>≡</Text>
+          </View>
+        </View>
+      )}
+
       <ParamSettingsSheet
         visible={sheetVisible}
         initial={sheetTarget}
         onSave={edit.saveParam}
+        onDisband={() => {
+          if (sheetTarget?.type === 'grid2d') edit.splitGrid2D(sheetTarget.id);
+          edit.closeSettings();
+        }}
         onClose={edit.closeSettings}
       />
-    </>
+    </View>
   );
 }
 
@@ -324,6 +486,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  editRoot: {
+    flex: 1,
   },
   scroll: {
     flex: 1,
@@ -340,5 +505,30 @@ const styles = StyleSheet.create({
     ...Typography.body,
     color: Colors.primary,
     fontWeight: '600',
+  },
+  ghost: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    backgroundColor: Colors.background,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 8,
+    opacity: 0.96,
+  },
+  ghostText: {
+    ...Typography.body,
+    color: Colors.text,
+    flex: 1,
+  },
+  ghostHandle: {
+    fontSize: 18,
+    color: Colors.textDisabled,
+    marginLeft: Spacing.md,
   },
 });

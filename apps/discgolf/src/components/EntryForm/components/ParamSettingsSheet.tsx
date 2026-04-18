@@ -31,7 +31,7 @@ function num(s: string, fallback = 0): number {
   return isNaN(n) ? fallback : n;
 }
 
-type ParamType = 'scalar' | 'named' | 'grid2d';
+type ParamType = 'scalar' | 'named';
 
 type ScalarFields = {
   name: string;
@@ -79,7 +79,7 @@ function buildScalar(id: string, fields: ScalarFields): ScalarParam {
   };
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Shared field components ──────────────────────────────────────────────────
 
 function SectionHeader({ title }: { title: string }) {
   return (
@@ -123,13 +123,7 @@ function FieldRow({ children }: { children: React.ReactNode }) {
   return <View style={ss.fieldRow}>{children}</View>;
 }
 
-function FormatPicker({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
+function FormatPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const options = [
     { key: '', label: '—' },
     { key: 'hyzer', label: 'hyzer' },
@@ -183,22 +177,91 @@ function ScalarAxisFields({
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// ─── Grid2D edit view (rename / swap axes / disband) ─────────────────────────
 
-interface Props {
-  visible: boolean;
-  initial: Param | null; // null = new param
+function Grid2DEditContent({
+  initial,
+  onSave,
+  onDisband,
+  onClose,
+}: {
+  initial: Grid2DParam;
   onSave: (param: Param) => void;
+  onDisband: () => void;
   onClose: () => void;
+}) {
+  const [title, setTitle] = useState(initial.name);
+  const [swapped, setSwapped] = useState(false);
+
+  const axisX = swapped ? initial.axisY : initial.axisX;
+  const axisY = swapped ? initial.axisX : initial.axisY;
+
+  const handleSave = () => {
+    const updated: Grid2DParam = {
+      ...initial,
+      name: title || `${axisX.name} × ${axisY.name}`,
+      axisX,
+      axisY,
+    };
+    onSave(updated);
+  };
+
+  return (
+    <View style={ss.sheet}>
+      <View style={ss.header}>
+        <TouchableOpacity onPress={onClose} style={ss.headerBtn} activeOpacity={0.7}>
+          <Text style={ss.cancelText}>Cancel</Text>
+        </TouchableOpacity>
+        <Text style={ss.headerTitle}>Edit 2D Row</Text>
+        <TouchableOpacity onPress={handleSave} style={ss.headerBtn} activeOpacity={0.7}>
+          <Text style={ss.saveText}>Save</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={ss.scroll} contentContainerStyle={ss.scrollContent} keyboardShouldPersistTaps="handled">
+        <Field label="Title" value={title} onChangeText={setTitle} placeholder={`${axisX.name} × ${axisY.name}`} />
+
+        <View style={ss.axisPreview}>
+          <View style={ss.axisChip}>
+            <Text style={ss.axisChipLabel}>X</Text>
+            <Text style={ss.axisChipName}>{axisX.name}</Text>
+          </View>
+          <TouchableOpacity style={ss.swapBtn} onPress={() => setSwapped((s) => !s)} activeOpacity={0.7}>
+            <Text style={ss.swapIcon}>⇄</Text>
+            <Text style={ss.swapLabel}>Swap</Text>
+          </TouchableOpacity>
+          <View style={ss.axisChip}>
+            <Text style={ss.axisChipLabel}>Y</Text>
+            <Text style={ss.axisChipName}>{axisY.name}</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity style={ss.disbandBtn} onPress={onDisband} activeOpacity={0.7}>
+          <Text style={ss.disbandText}>Split into separate rows</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
+  );
 }
 
-function SheetContent({ initial, onSave, onClose }: Omit<Props, 'visible'>) {
+// ─── Scalar / Named creator / editor ─────────────────────────────────────────
+
+function ScalarNamedContent({
+  initial,
+  onSave,
+  onClose,
+}: {
+  initial: Param | null;
+  onSave: (param: Param) => void;
+  onClose: () => void;
+}) {
   const isNew = initial === null;
   const existingId = initial?.id ?? uid();
 
-  const [paramType, setParamType] = useState<ParamType>(initial?.type ?? 'scalar');
+  const [paramType, setParamType] = useState<ParamType>(
+    initial?.type === 'named' ? 'named' : 'scalar',
+  );
 
-  // Scalar state
   const [scalarName, setScalarName] = useState(
     initial?.type === 'scalar' ? initial.name : '',
   );
@@ -206,72 +269,32 @@ function SheetContent({ initial, onSave, onClose }: Omit<Props, 'visible'>) {
     initial?.type === 'scalar' ? scalarToFields(initial) : defaultScalarFields(),
   );
 
-  // Named state
   const [namedName, setNamedName] = useState(initial?.type === 'named' ? initial.name : '');
   const [options, setOptions] = useState<{ id: string; label: string }[]>(
     initial?.type === 'named' ? initial.options : [],
   );
 
-  // Grid2D state
-  const [axisXFields, setAxisXFields] = useState<ScalarFields>(
-    initial?.type === 'grid2d'
-      ? scalarToFields(initial.axisX)
-      : defaultScalarFields('X'),
-  );
-  const [axisYFields, setAxisYFields] = useState<ScalarFields>(
-    initial?.type === 'grid2d'
-      ? scalarToFields(initial.axisY)
-      : defaultScalarFields('Y'),
-  );
-
   const addOption = () => setOptions((prev) => [...prev, { id: uid(), label: '' }]);
   const updateOption = (id: string, label: string) =>
     setOptions((prev) => prev.map((o) => (o.id === id ? { ...o, label } : o)));
-  const removeOption = (id: string) =>
-    setOptions((prev) => prev.filter((o) => o.id !== id));
+  const removeOption = (id: string) => setOptions((prev) => prev.filter((o) => o.id !== id));
 
   const handleSave = () => {
-    switch (paramType) {
-      case 'scalar':
-        onSave(buildScalar(existingId, { ...scalarFields, name: scalarName }));
-        break;
-      case 'named': {
-        const named: NamedParam = {
-          id: existingId,
-          name: namedName,
-          type: 'named',
-          options: options.filter((o) => o.label.trim() !== ''),
-        };
-        onSave(named);
-        break;
-      }
-      case 'grid2d': {
-        const axisXId = initial?.type === 'grid2d' ? initial.axisX.id : uid();
-        const axisYId = initial?.type === 'grid2d' ? initial.axisY.id : uid();
-        const axisX = buildScalar(axisXId, axisXFields);
-        const axisY = buildScalar(axisYId, axisYFields);
-        const grid: Grid2DParam = {
-          id: existingId,
-          name: `${axisX.name} × ${axisY.name}`,
-          type: 'grid2d',
-          axisX,
-          axisY,
-        };
-        onSave(grid);
-        break;
-      }
+    if (paramType === 'scalar') {
+      onSave(buildScalar(existingId, { ...scalarFields, name: scalarName }));
+    } else {
+      const named: NamedParam = {
+        id: existingId,
+        name: namedName,
+        type: 'named',
+        options: options.filter((o) => o.label.trim() !== ''),
+      };
+      onSave(named);
     }
   };
 
-  const TYPE_OPTIONS: { key: ParamType; label: string }[] = [
-    { key: 'scalar', label: 'Scalar' },
-    { key: 'named', label: 'Named' },
-    { key: 'grid2d', label: 'Grid 2D' },
-  ];
-
   return (
     <View style={ss.sheet}>
-      {/* Header */}
       <View style={ss.header}>
         <TouchableOpacity onPress={onClose} style={ss.headerBtn} activeOpacity={0.7}>
           <Text style={ss.cancelText}>Cancel</Text>
@@ -287,23 +310,22 @@ function SheetContent({ initial, onSave, onClose }: Omit<Props, 'visible'>) {
         contentContainerStyle={ss.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Type selector */}
+        {/* Type selector — scalar and named only */}
         <View style={ss.typePicker}>
-          {TYPE_OPTIONS.map((o) => (
+          {(['scalar', 'named'] as ParamType[]).map((t) => (
             <TouchableOpacity
-              key={o.key}
-              style={[ss.typeOption, paramType === o.key && ss.typeOptionActive]}
-              onPress={() => setParamType(o.key)}
+              key={t}
+              style={[ss.typeOption, paramType === t && ss.typeOptionActive]}
+              onPress={() => setParamType(t)}
               activeOpacity={0.7}
             >
-              <Text style={[ss.typeOptionText, paramType === o.key && ss.typeOptionTextActive]}>
-                {o.label}
+              <Text style={[ss.typeOptionText, paramType === t && ss.typeOptionTextActive]}>
+                {t.charAt(0).toUpperCase() + t.slice(1)}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Scalar fields */}
         {paramType === 'scalar' && (
           <>
             <Field label="Name" value={scalarName} onChangeText={setScalarName} />
@@ -314,7 +336,6 @@ function SheetContent({ initial, onSave, onClose }: Omit<Props, 'visible'>) {
           </>
         )}
 
-        {/* Named fields */}
         {paramType === 'named' && (
           <>
             <Field label="Name" value={namedName} onChangeText={setNamedName} />
@@ -339,38 +360,24 @@ function SheetContent({ initial, onSave, onClose }: Omit<Props, 'visible'>) {
             </TouchableOpacity>
           </>
         )}
-
-        {/* Grid 2D fields */}
-        {paramType === 'grid2d' && (
-          <>
-            <SectionHeader title="X Axis" />
-            <Field
-              label="Name"
-              value={axisXFields.name}
-              onChangeText={(t) => setAxisXFields((prev) => ({ ...prev, name: t }))}
-            />
-            <ScalarAxisFields
-              fields={axisXFields}
-              onChange={(patch) => setAxisXFields((prev) => ({ ...prev, ...patch }))}
-            />
-            <SectionHeader title="Y Axis" />
-            <Field
-              label="Name"
-              value={axisYFields.name}
-              onChangeText={(t) => setAxisYFields((prev) => ({ ...prev, name: t }))}
-            />
-            <ScalarAxisFields
-              fields={axisYFields}
-              onChange={(patch) => setAxisYFields((prev) => ({ ...prev, ...patch }))}
-            />
-          </>
-        )}
       </ScrollView>
     </View>
   );
 }
 
-export function ParamSettingsSheet({ visible, initial, onSave, onClose }: Props) {
+// ─── Public component ─────────────────────────────────────────────────────────
+
+interface Props {
+  visible: boolean;
+  initial: Param | null; // null = new param; Grid2DParam shows the simplified 2D editor
+  onSave: (param: Param) => void;
+  onDisband: () => void;
+  onClose: () => void;
+}
+
+export function ParamSettingsSheet({ visible, initial, onSave, onDisband, onClose }: Props) {
+  const isGrid2D = initial?.type === 'grid2d';
+
   return (
     <Modal
       visible={visible}
@@ -382,13 +389,22 @@ export function ParamSettingsSheet({ visible, initial, onSave, onClose }: Props)
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Key forces remount when the target param changes */}
-        <SheetContent
-          key={initial?.id ?? 'new'}
-          initial={initial}
-          onSave={onSave}
-          onClose={onClose}
-        />
+        {isGrid2D ? (
+          <Grid2DEditContent
+            key={initial!.id}
+            initial={initial as Grid2DParam}
+            onSave={onSave}
+            onDisband={onDisband}
+            onClose={onClose}
+          />
+        ) : (
+          <ScalarNamedContent
+            key={initial?.id ?? 'new'}
+            initial={initial}
+            onSave={onSave}
+            onClose={onClose}
+          />
+        )}
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -555,5 +571,63 @@ const ss = StyleSheet.create({
   addOptionText: {
     ...Typography.body,
     color: Colors.primary,
+  },
+  // Grid2D edit styles
+  axisPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.lg,
+    gap: Spacing.md,
+    borderBottomWidth: hairline,
+    borderBottomColor: Colors.separator,
+  },
+  axisChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  axisChipLabel: {
+    ...Typography.labelSm,
+    color: Colors.textMuted,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  axisChipName: {
+    ...Typography.label,
+    color: Colors.text,
+    flexShrink: 1,
+  },
+  swapBtn: {
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: Spacing.sm,
+  },
+  swapIcon: {
+    fontSize: 20,
+    color: Colors.primary,
+  },
+  swapLabel: {
+    ...Typography.labelSm,
+    color: Colors.primary,
+  },
+  disbandBtn: {
+    margin: Spacing.lg,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.separator,
+    alignItems: 'center',
+    minHeight: MIN_HIT,
+    justifyContent: 'center',
+  },
+  disbandText: {
+    ...Typography.body,
+    color: '#EF4444',
   },
 });
