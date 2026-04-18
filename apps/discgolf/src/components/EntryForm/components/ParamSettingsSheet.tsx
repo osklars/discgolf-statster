@@ -43,7 +43,6 @@ type ScalarFields = {
   unit: string;
   lblMin: string;
   lblMax: string;
-  displayFormat: string;
 };
 
 function scalarToFields(p: ScalarParam): ScalarFields {
@@ -56,12 +55,11 @@ function scalarToFields(p: ScalarParam): ScalarFields {
     unit: p.unit ?? '',
     lblMin: p.lblMin,
     lblMax: p.lblMax,
-    displayFormat: p.displayFormat ?? '',
   };
 }
 
 function defaultScalarFields(name = ''): ScalarFields {
-  return { name, min: '0', max: '10', step: '1', majorStep: '1', unit: '', lblMin: '', lblMax: '', displayFormat: '' };
+  return { name, min: '0', max: '10', step: '1', majorStep: '1', unit: '', lblMin: '', lblMax: '' };
 }
 
 function buildScalar(id: string, fields: ScalarFields): ScalarParam {
@@ -76,7 +74,6 @@ function buildScalar(id: string, fields: ScalarFields): ScalarParam {
     unit: fields.unit || undefined,
     lblMin: fields.lblMin,
     lblMax: fields.lblMax,
-    displayFormat: fields.displayFormat || undefined,
   };
 }
 
@@ -124,33 +121,6 @@ function FieldRow({ children }: { children: React.ReactNode }) {
   return <View style={ss.fieldRow}>{children}</View>;
 }
 
-function FormatPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const options = [
-    { key: '', label: '—' },
-    { key: 'hyzer', label: 'hyzer' },
-    { key: 'nose', label: 'nose' },
-  ];
-  return (
-    <View style={ss.field}>
-      <Text style={ss.fieldLabel}>Display format</Text>
-      <View style={ss.formatPicker}>
-        {options.map((o) => (
-          <TouchableOpacity
-            key={o.key}
-            style={[ss.formatOption, value === o.key && ss.formatOptionActive]}
-            onPress={() => onChange(o.key)}
-            activeOpacity={0.7}
-          >
-            <Text style={[ss.formatOptionText, value === o.key && ss.formatOptionTextActive]}>
-              {o.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-}
-
 function ScalarAxisFields({
   fields,
   onChange,
@@ -173,7 +143,6 @@ function ScalarAxisFields({
         <Field label="Max label" value={fields.lblMax} onChangeText={(t) => onChange({ lblMax: t })} />
       </FieldRow>
       <Field label="Unit (optional)" value={fields.unit} onChangeText={(t) => onChange({ unit: t })} />
-      <FormatPicker value={fields.displayFormat} onChange={(v) => onChange({ displayFormat: v })} />
     </>
   );
 }
@@ -582,29 +551,6 @@ const ss = StyleSheet.create({
     color: Colors.text,
     paddingVertical: 4,
     minHeight: 32,
-  },
-  formatPicker: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    paddingVertical: 4,
-  },
-  formatOption: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    borderColor: Colors.separator,
-  },
-  formatOptionActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  formatOptionText: {
-    ...Typography.label,
-    color: Colors.textMuted,
-  },
-  formatOptionTextActive: {
-    color: Colors.background,
   },
   optionRow: {
     flexDirection: 'row',

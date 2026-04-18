@@ -9,7 +9,6 @@ export type ScalarParam = {
   unit?: string;
   lblMin: string;
   lblMax: string;
-  displayFormat?: string;
 };
 
 export type NamedParam = {

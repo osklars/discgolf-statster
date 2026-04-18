@@ -59,15 +59,8 @@ export function ParamRow({
   const handleGrid2DLive = useCallback(
     (x: number, y: number) => {
       const p = param as Grid2DParam;
-      const fmtAxis = (v: number, axis: ScalarParam): string => {
-        if (axis.displayFormat === 'hyzer') {
-          return v === 0 ? 'flat' : v > 0 ? `${v}a` : `${Math.abs(v)}h`;
-        }
-        if (axis.displayFormat === 'nose') {
-          return v === 0 ? '—' : v > 0 ? `${v}↑` : `${Math.abs(v)}↓`;
-        }
-        return axis.unit ? `${v}${axis.unit}` : String(v);
-      };
+      const fmtAxis = (v: number, axis: ScalarParam): string =>
+        axis.unit ? `${v}${axis.unit}` : String(v);
       setLiveDisplay(`${fmtAxis(x, p.axisX)} × ${fmtAxis(y, p.axisY)}`);
     },
     [param],

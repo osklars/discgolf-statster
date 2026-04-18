@@ -73,7 +73,6 @@ const PRACTICE_ROUND: FormDefinition = {
       majorStep: 1,
       lblMin: 'hyzer',
       lblMax: 'anhyzer',
-      displayFormat: 'hyzer',
     },
     {
       id: 'nose_i',
@@ -85,7 +84,6 @@ const PRACTICE_ROUND: FormDefinition = {
       majorStep: 1,
       lblMin: 'nose ↓',
       lblMax: 'nose ↑',
-      displayFormat: 'nose',
     },
     {
       id: 'exec',
