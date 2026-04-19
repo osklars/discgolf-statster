@@ -7,22 +7,30 @@ import { EntryForm } from '../components/EntryForm';
 import type { Param, ParamValue } from '../components/EntryForm/types';
 import { Colors } from '../constants/theme';
 import { startSession } from '../db/sessions';
-import { createEntry } from '../db/entries';
+import { createEntry, getEntriesForSession } from '../db/entries';
 import { insertDatapoints } from '../db/datapoints';
 import { formValuesToDatapoints } from '../db/mappers';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SessionForm'>;
 
-export function SessionFormScreen({ navigation }: Props) {
+export function SessionFormScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const existingSessionId = route.params?.sessionId;
   const sessionIdRef = useRef<string | null>(null);
   const [entryCount, setEntryCount] = useState(0);
 
   useEffect(() => {
-    startSession().then((session) => {
-      sessionIdRef.current = session.id;
-    }).catch(console.error);
-  }, []);
+    if (existingSessionId) {
+      sessionIdRef.current = existingSessionId;
+      getEntriesForSession(existingSessionId)
+        .then((entries) => setEntryCount(entries.length))
+        .catch(console.error);
+    } else {
+      startSession().then((session) => {
+        sessionIdRef.current = session.id;
+      }).catch(console.error);
+    }
+  }, [existingSessionId]);
 
   const handleLogThrow = useCallback(async (
     formId: string,

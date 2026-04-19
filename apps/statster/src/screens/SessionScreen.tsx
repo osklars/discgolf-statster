@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
-import { Colors, Radius, Spacing, Typography, hairline } from '../constants/theme';
+import { Colors, MIN_HIT, Radius, Spacing, Typography, hairline } from '../constants/theme';
 import type { DatapointsForEntry, Entry, Session } from '../db/types';
 import { getSession } from '../db/sessions';
 import { getEntriesForSession } from '../db/entries';
@@ -69,7 +69,7 @@ function EntryCard({
   );
 }
 
-export function SessionScreen({ route }: Props) {
+export function SessionScreen({ route, navigation }: Props) {
   const { sessionId } = route.params;
   const [session, setSession] = useState<Session | null>(null);
   const [entriesWithData, setEntriesWithData] = useState<EntryWithDatapoints[]>([]);
@@ -131,7 +131,6 @@ export function SessionScreen({ route }: Props) {
   }
 
   const totalXp = entriesWithData.reduce((sum, e) => sum + e.xp, 0);
-  const avgXp = entriesWithData.length ? Math.round(totalXp / entriesWithData.length) : 0;
 
   const allScalars = entriesWithData.flatMap((e) => e.datapoints.scalars);
   const grades = allScalars.filter((s) => s.parameterId === 'grade').map((s) => s.value);
@@ -140,53 +139,86 @@ export function SessionScreen({ route }: Props) {
   const maxDist = dists.length ? Math.max(...dists) : null;
 
   return (
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.sessionMeta}>
-        <Text style={styles.sessionDate}>{formatDate(session.startedAt)}</Text>
+    <View style={styles.root}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.sessionMeta}>
+          <Text style={styles.sessionDate}>{formatDate(session.startedAt)}</Text>
+        </View>
+
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryValue}>{entriesWithData.length}</Text>
+            <Text style={styles.summaryLabel}>Throws</Text>
+          </View>
+          <View style={styles.summarySep} />
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryValue}>{totalXp}</Text>
+            <Text style={styles.summaryLabel}>Total XP</Text>
+          </View>
+          <View style={styles.summarySep} />
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryValue}>{avgGrade !== null ? avgGrade.toFixed(1) : '—'}</Text>
+            <Text style={styles.summaryLabel}>Avg grade</Text>
+          </View>
+          <View style={styles.summarySep} />
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryValue}>{maxDist !== null ? `${maxDist}m` : '—'}</Text>
+            <Text style={styles.summaryLabel}>Best dist</Text>
+          </View>
+        </View>
+
+        <View style={styles.divider} />
+
+        {entriesWithData.map((ewdp, i) => (
+          <EntryCard key={ewdp.entry.id} ewdp={ewdp} index={i} lookups={lookups} />
+        ))}
+
+        {entriesWithData.length === 0 && (
+          <Text style={styles.emptyText}>No throws logged yet.</Text>
+        )}
+      </ScrollView>
+
+      <View style={styles.stickyBar}>
+        <TouchableOpacity
+          style={styles.continueBtn}
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('SessionForm', { sessionId })}
+        >
+          <Text style={styles.continueBtnText}>Continue session</Text>
+        </TouchableOpacity>
       </View>
-
-      <View style={styles.summaryRow}>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{entriesWithData.length}</Text>
-          <Text style={styles.summaryLabel}>Throws</Text>
-        </View>
-        <View style={styles.summarySep} />
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{totalXp}</Text>
-          <Text style={styles.summaryLabel}>Total XP</Text>
-        </View>
-        <View style={styles.summarySep} />
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{avgGrade !== null ? avgGrade.toFixed(1) : '—'}</Text>
-          <Text style={styles.summaryLabel}>Avg grade</Text>
-        </View>
-        <View style={styles.summarySep} />
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{maxDist !== null ? `${maxDist}m` : '—'}</Text>
-          <Text style={styles.summaryLabel}>Best dist</Text>
-        </View>
-      </View>
-
-      <View style={styles.divider} />
-
-      {entriesWithData.map((ewdp, i) => (
-        <EntryCard key={ewdp.entry.id} ewdp={ewdp} index={i} lookups={lookups} />
-      ))}
-
-      {entriesWithData.length === 0 && (
-        <Text style={styles.emptyText}>No throws logged yet.</Text>
-      )}
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
+  scroll: { flex: 1 },
   content: { padding: Spacing.lg, gap: Spacing.md, paddingBottom: Spacing.xl },
+  stickyBar: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.lg,
+    borderTopWidth: hairline,
+    borderTopColor: Colors.separator,
+    backgroundColor: Colors.background,
+  },
+  continueBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: MIN_HIT,
+  },
+  continueBtnText: {
+    ...Typography.body,
+    color: '#fff',
+    fontWeight: '700',
+  },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
   emptyText: { ...Typography.body, color: Colors.textMuted, textAlign: 'center' },
   sessionMeta: { gap: 2 },

@@ -1,4 +1,31 @@
 import { getSkillDb } from './skillDb';
+import { queryEntries } from './queries';
+
+// ── Level curve ───────────────────────────────────────────────────────────────
+// Cumulative XP to reach level n: n*(n+1)/2 * 500
+// XP gap between levels grows linearly: level 1 costs 500, level 2 costs 1000, etc.
+
+export function levelThreshold(n: number): number {
+  return (n * (n + 1) / 2) * 500;
+}
+
+export function xpToLevel(totalXp: number): {
+  level: number;
+  progress: number;
+  xpInLevel: number;
+  xpForNext: number;
+} {
+  let level = 0;
+  while (levelThreshold(level + 1) <= totalXp) level++;
+  const lo = levelThreshold(level);
+  const hi = levelThreshold(level + 1);
+  return {
+    level,
+    progress: hi === lo ? 1 : (totalXp - lo) / (hi - lo),
+    xpInLevel: totalXp - lo,
+    xpForNext: hi - totalXp,
+  };
+}
 
 export const BASE_XP = 40;
 
@@ -15,6 +42,24 @@ function qualityWeight(value: number, min: number, max: number, target: number):
   if (maxDist === 0) return 2;
   return 2 - 1.5 * (Math.abs(value - target) / maxDist);
 }
+
+// ── Filtered XP total ─────────────────────────────────────────────────────────
+
+export async function getXpWithFilters(
+  namedFilters: { parameterId: string; optionId: string }[],
+): Promise<{ totalXp: number; entryCount: number }> {
+  const entries = await queryEntries({
+    namedFilters: namedFilters.map((f) => ({ parameterId: f.parameterId, optionIds: [f.optionId] })),
+  });
+  if (entries.length === 0) return { totalXp: 0, entryCount: 0 };
+  const xpResults = await computeXpForEntries(entries.map((e) => e.id));
+  return {
+    totalXp: xpResults.reduce((sum, r) => sum + r.xp, 0),
+    entryCount: entries.length,
+  };
+}
+
+// ── Per-entry XP ──────────────────────────────────────────────────────────────
 
 export async function computeXpForEntries(
   entryIds: string[],
