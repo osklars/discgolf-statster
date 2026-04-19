@@ -74,12 +74,12 @@ export async function loadFormDefinitions(): Promise<{
     for (const fp of formParams) {
       if (fp.paramType === 'scalar') {
         const s = scalarMap.get(fp.paramId);
-        if (s) ordered.push({ sortOrder: fp.sortOrder, param: dbToScalarParam(s) });
+        if (s) ordered.push({ sortOrder: fp.sortOrder, param: { ...dbToScalarParam(s), clearAfterSubmit: fp.clearAfterSubmit } });
       } else {
         const n = namedMap.get(fp.paramId);
         if (n) ordered.push({
           sortOrder: fp.sortOrder,
-          param: dbToNamedParam(n, optionsByParam.get(n.id) ?? []),
+          param: { ...dbToNamedParam(n, optionsByParam.get(n.id) ?? []), clearAfterSubmit: fp.clearAfterSubmit },
         });
       }
     }
@@ -94,6 +94,7 @@ export async function loadFormDefinitions(): Promise<{
             id: g.id, name: g.name, type: 'grid2d',
             axisX: dbToScalarParam(axisX),
             axisY: dbToScalarParam(axisY),
+            clearAfterSubmit: g.clearAfterSubmit,
           } as Grid2DParam,
         });
       }

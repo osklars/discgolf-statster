@@ -1,12 +1,61 @@
 import { upsertNamedOption, upsertNamedParameter, upsertScalarParameter } from './parameters';
 import { getForms, upsertForm, saveFormLayout } from './forms';
+import { getSkillDb } from './skillDb';
+import { SKILL_DB_SCHEMA } from './schema';
+
+const SEED_VERSION = 3;
+
+const WIPE_DATA_SQL = `
+  DROP TABLE IF EXISTS named_datapoint;
+  DROP TABLE IF EXISTS scalar_datapoint;
+  DROP TABLE IF EXISTS entry;
+  DROP TABLE IF EXISTS session;
+  DROP TABLE IF EXISTS form_param;
+  DROP TABLE IF EXISTS form_grid2d;
+  DROP TABLE IF EXISTS form;
+  DROP TABLE IF EXISTS named_option;
+  DROP TABLE IF EXISTS named_parameter;
+  DROP TABLE IF EXISTS scalar_parameter;
+`;
 
 export async function seedIfEmpty(): Promise<void> {
-  const existing = await getForms();
-  if (existing.length > 0) return;
+  const db = getSkillDb();
 
+  let storedVersion = 0;
+  try {
+    const row = await db.getFirstAsync<{ value: string }>(
+      "SELECT value FROM seed_meta WHERE key = 'seed_version'",
+    );
+    storedVersion = row ? parseInt(row.value, 10) : 0;
+  } catch {
+    storedVersion = 0;
+  }
+
+  if (storedVersion === SEED_VERSION) return;
+
+  await db.execAsync(WIPE_DATA_SQL);
+  await db.execAsync(SKILL_DB_SCHEMA);
   await seedDiscGolf();
+  await db.runAsync(
+    "INSERT OR REPLACE INTO seed_meta (key, value) VALUES ('seed_version', ?)",
+    [String(SEED_VERSION)],
+  );
 }
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+type NE = { type: 'named'; paramId: string; sortOrder: number; clearAfterSubmit?: boolean };
+type SE = { type: 'scalar'; paramId: string; sortOrder: number; clearAfterSubmit?: boolean };
+type LayoutRow = NE | SE;
+
+function n(paramId: string, sortOrder: number, clearAfterSubmit = true): NE {
+  return { type: 'named', paramId, sortOrder, clearAfterSubmit };
+}
+function s(paramId: string, sortOrder: number, clearAfterSubmit = true): SE {
+  return { type: 'scalar', paramId, sortOrder, clearAfterSubmit };
+}
+
+// ── Seed data ─────────────────────────────────────────────────────────────────
 
 async function seedDiscGolf(): Promise<void> {
   // ── Named parameters ────────────────────────────────────────────────────────
@@ -30,14 +79,14 @@ async function seedDiscGolf(): Promise<void> {
 
   await upsertNamedParameter({ id: 'shot_shape', name: 'Shot shape' });
   const shapes = [
-    { id: 'ss_straight',   label: 'Straight' },
-    { id: 'ss_hyzer',      label: 'Hyzer' },
-    { id: 'ss_ani',        label: 'Anhyzer' },
-    { id: 'ss_flex',       label: 'Flex' },
-    { id: 'ss_spike',      label: 'Spike hyzer' },
-    { id: 'ss_grenade',    label: 'Grenade' },
-    { id: 'ss_tomahawk',   label: 'Tomahawk' },
-    { id: 'ss_roller',     label: 'Roller' },
+    { id: 'ss_straight', label: 'Straight'    },
+    { id: 'ss_hyzer',    label: 'Hyzer'       },
+    { id: 'ss_ani',      label: 'Anhyzer'     },
+    { id: 'ss_flex',     label: 'Flex'        },
+    { id: 'ss_spike',    label: 'Spike hyzer' },
+    { id: 'ss_grenade',  label: 'Grenade'     },
+    { id: 'ss_tomahawk', label: 'Tomahawk'    },
+    { id: 'ss_roller',   label: 'Roller'      },
   ];
   for (let i = 0; i < shapes.length; i++) {
     await upsertNamedOption({ id: shapes[i].id, parameterId: 'shot_shape', label: shapes[i].label, sortOrder: i });
@@ -70,11 +119,11 @@ async function seedDiscGolf(): Promise<void> {
 
   await upsertNamedParameter({ id: 'lie', name: 'Lie' });
   const lies = [
-    { id: 'lie_tee',  label: 'Tee' },
-    { id: 'lie_fair', label: 'Fairway' },
+    { id: 'lie_tee',  label: 'Tee'      },
+    { id: 'lie_fair', label: 'Fairway'  },
     { id: 'lie_scr',  label: 'Scramble' },
     { id: 'lie_app',  label: 'Approach' },
-    { id: 'lie_putt', label: 'Putt' },
+    { id: 'lie_putt', label: 'Putt'     },
   ];
   for (let i = 0; i < lies.length; i++) {
     await upsertNamedOption({ id: lies[i].id, parameterId: 'lie', label: lies[i].label, sortOrder: i });
@@ -82,61 +131,42 @@ async function seedDiscGolf(): Promise<void> {
 
   // ── Scalar parameters ───────────────────────────────────────────────────────
 
-  await upsertScalarParameter({ id: 'diff',        name: 'Difficulty',       min: 1, max: 10,  step: 1, majorStep: 1,  lblMin: 'easy',  lblMax: 'hard',  unit: null });
-  await upsertScalarParameter({ id: 'grade',       name: 'Grade',            min: 1, max: 10,  step: 1, majorStep: 1,  lblMin: 'shank', lblMax: 'pure',  unit: null });
-  await upsertScalarParameter({ id: 'target_dist', name: 'Target distance',  min: 0, max: 200, step: 5, majorStep: 50, lblMin: '0m',    lblMax: '200m',  unit: 'm'  });
-  await upsertScalarParameter({ id: 'distance',    name: 'Distance',         min: 0, max: 200, step: 5, majorStep: 50, lblMin: '0m',    lblMax: '200m',  unit: 'm'  });
+  await upsertScalarParameter({ id: 'diff',        name: 'Difficulty',      min: 1, max: 10,  step: 1, majorStep: 1,  lblMin: 'easy',  lblMax: 'hard',  unit: null });
+  await upsertScalarParameter({ id: 'grade',       name: 'Grade',           min: 1, max: 10,  step: 1, majorStep: 1,  lblMin: 'shank', lblMax: 'pure',  unit: null });
+  await upsertScalarParameter({ id: 'target_dist', name: 'Target distance', min: 0, max: 200, step: 5, majorStep: 50, lblMin: '0m',    lblMax: '200m',  unit: 'm'  });
+  await upsertScalarParameter({ id: 'distance',    name: 'Distance',        min: 0, max: 200, step: 5, majorStep: 50, lblMin: '0m',    lblMax: '200m',  unit: 'm'  });
 
   // ── Forms ───────────────────────────────────────────────────────────────────
+  // clearAfterSubmit defaults to true; pass false for "sticky" params (disc, hand, throw type)
 
   await upsertForm({ id: 'throw', name: 'Throw', sortOrder: 0 });
   await saveFormLayout('throw', [
-    { type: 'named',  paramId: 'disc',          sortOrder: 0 },
-    { type: 'named',  paramId: 'hand',          sortOrder: 1 },
-    { type: 'named',  paramId: 'shot_shape',    sortOrder: 2 },
-    { type: 'scalar', paramId: 'target_dist',   sortOrder: 3 },
-    { type: 'scalar', paramId: 'diff',          sortOrder: 4 },
-    { type: 'scalar', paramId: 'grade',         sortOrder: 5 },
-    { type: 'scalar', paramId: 'distance',      sortOrder: 6 },
-    { type: 'named',  paramId: 'release_angle', sortOrder: 7 },
-    { type: 'named',  paramId: 'line',          sortOrder: 8 },
-    { type: 'named',  paramId: 'flip',          sortOrder: 9 },
-    { type: 'named',  paramId: 'height',        sortOrder: 10 },
-    { type: 'named',  paramId: 'throw_type',    sortOrder: 11 },
-  ]);
+    n('disc',          0,  false),
+    n('hand',          1,  false),
+    n('shot_shape',    2),
+    s('target_dist',   3),
+    s('diff',          4),
+    s('grade',         5),
+    s('distance',      6),
+    n('release_angle', 7),
+    n('line',          8),
+    n('flip',          9),
+    n('height',        10),
+    n('throw_type',    11, false),
+  ] satisfies LayoutRow[]);
 
-  await upsertForm({ id: 'throw_mini', name: 'Throw mini', sortOrder: 1 });
-  await saveFormLayout('throw_mini', [
-    { type: 'named',  paramId: 'disc',       sortOrder: 0 },
-    { type: 'named',  paramId: 'hand',       sortOrder: 1 },
-    { type: 'scalar', paramId: 'grade',      sortOrder: 2 },
-    { type: 'named',  paramId: 'throw_type', sortOrder: 3 },
-  ]);
+  await upsertForm({ id: 'throw_slim', name: 'Throw slim', sortOrder: 1 });
+  await saveFormLayout('throw_slim', [
+    n('disc',       0, false),
+    n('hand',       1, false),
+    s('grade',      2),
+    n('throw_type', 3, false),
+  ] satisfies LayoutRow[]);
 
-  await upsertForm({ id: 'throw_detailed', name: 'Throw detailed', sortOrder: 2 });
-  await saveFormLayout('throw_detailed', [
-    { type: 'named',  paramId: 'lie',          sortOrder: 0 },
-    { type: 'named',  paramId: 'disc',         sortOrder: 1 },
-    { type: 'named',  paramId: 'hand',         sortOrder: 2 },
-    { type: 'named',  paramId: 'shot_shape',   sortOrder: 3 },
-    { type: 'scalar', paramId: 'target_dist',  sortOrder: 4 },
-    { type: 'scalar', paramId: 'diff',         sortOrder: 5 },
-    { type: 'scalar', paramId: 'grade',        sortOrder: 6 },
-    { type: 'scalar', paramId: 'distance',     sortOrder: 7 },
-    { type: 'named',  paramId: 'release_angle',sortOrder: 8 },
-    { type: 'named',  paramId: 'line',         sortOrder: 9 },
-    { type: 'named',  paramId: 'flip',         sortOrder: 10 },
-    { type: 'named',  paramId: 'height',       sortOrder: 11 },
-    { type: 'named',  paramId: 'throw_type',   sortOrder: 12 },
-  ]);
-
-  await upsertForm({ id: 'putt', name: 'Putt', sortOrder: 3 });
+  await upsertForm({ id: 'putt', name: 'Putt', sortOrder: 2 });
   await saveFormLayout('putt', [
-    { type: 'named',  paramId: 'disc',       sortOrder: 0 },
-    { type: 'named',  paramId: 'hand',       sortOrder: 1 },
-    { type: 'scalar', paramId: 'target_dist',sortOrder: 2 },
-    { type: 'scalar', paramId: 'diff',       sortOrder: 3 },
-    { type: 'scalar', paramId: 'grade',      sortOrder: 4 },
-    { type: 'named',  paramId: 'throw_type', sortOrder: 5 },
-  ]);
+    n('disc',       0, false),
+    n('hand',       1, false),
+    n('throw_type', 2, false),
+  ] satisfies LayoutRow[]);
 }

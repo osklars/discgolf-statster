@@ -177,7 +177,7 @@ function ViewModeContent({ formDef, entryCount, onLogThrow }: ViewModeProps) {
     if (onLogThrow) {
       await onLogThrow(formDef.id, formDef.params, form.values);
     }
-    form.clearAll();
+    form.clearSubmitted();
   }, [onLogThrow, formDef, form]);
 
   return (

@@ -9,6 +9,7 @@ export type ScalarParam = {
   unit?: string;
   lblMin: string;
   lblMax: string;
+  clearAfterSubmit?: boolean;
 };
 
 export type NamedParam = {
@@ -16,6 +17,7 @@ export type NamedParam = {
   name: string;
   type: 'named';
   options: { id: string; label: string }[];
+  clearAfterSubmit?: boolean;
 };
 
 export type Grid2DParam = {
@@ -24,6 +26,7 @@ export type Grid2DParam = {
   type: 'grid2d';
   axisX: ScalarParam;
   axisY: ScalarParam;
+  clearAfterSubmit?: boolean;
 };
 
 export type Param = ScalarParam | NamedParam | Grid2DParam;

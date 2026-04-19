@@ -12,6 +12,7 @@ export function useEntryForm(params: Param[]): EntryFormState & {
   setValue: (id: string, value: ParamValue) => void;
   clearValue: (id: string) => void;
   clearAll: () => void;
+  clearSubmitted: () => void;
   formatValue: (param: Param, raw: ParamValue | undefined) => string;
 } {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
@@ -91,5 +92,20 @@ export function useEntryForm(params: Param[]): EntryFormState & {
 
   const clearAll = useCallback(() => setValues({}), []);
 
-  return { expandedIds, values, params, toggleExpanded, setValue, clearValue, clearAll, formatValue };
+  const clearSubmitted = useCallback(() => {
+    setValues((prev) => {
+      const next = { ...prev };
+      for (const param of params) {
+        if (param.clearAfterSubmit === false) continue;
+        delete next[param.id];
+        if (param.type === 'grid2d') {
+          delete next[param.axisX.id];
+          delete next[param.axisY.id];
+        }
+      }
+      return next;
+    });
+  }, [params]);
+
+  return { expandedIds, values, params, toggleExpanded, setValue, clearValue, clearAll, clearSubmitted, formatValue };
 }

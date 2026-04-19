@@ -37,6 +37,7 @@ export type FormParam = {
   paramId: string;
   paramType: 'scalar' | 'named';
   sortOrder: number;
+  clearAfterSubmit: boolean;
 };
 
 export type FormGrid2D = {
@@ -46,6 +47,7 @@ export type FormGrid2D = {
   axisXId: string;
   axisYId: string;
   sortOrder: number;
+  clearAfterSubmit: boolean;
 };
 
 export type Session = {

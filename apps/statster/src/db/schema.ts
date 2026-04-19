@@ -37,20 +37,27 @@ export const SKILL_DB_SCHEMA = `
   );
 
   CREATE TABLE IF NOT EXISTS form_param (
-    form_id    TEXT NOT NULL REFERENCES form(id) ON DELETE CASCADE,
-    param_id   TEXT NOT NULL,
-    param_type TEXT NOT NULL,
-    sort_order INTEGER NOT NULL DEFAULT 0,
+    form_id             TEXT NOT NULL REFERENCES form(id) ON DELETE CASCADE,
+    param_id            TEXT NOT NULL,
+    param_type          TEXT NOT NULL,
+    sort_order          INTEGER NOT NULL DEFAULT 0,
+    clear_after_submit  INTEGER NOT NULL DEFAULT 1,
     PRIMARY KEY (form_id, param_id)
   );
 
   CREATE TABLE IF NOT EXISTS form_grid2d (
-    id         TEXT PRIMARY KEY,
-    form_id    TEXT NOT NULL REFERENCES form(id) ON DELETE CASCADE,
-    name       TEXT NOT NULL,
-    axis_x_id  TEXT NOT NULL REFERENCES scalar_parameter(id) ON DELETE CASCADE,
-    axis_y_id  TEXT NOT NULL REFERENCES scalar_parameter(id) ON DELETE CASCADE,
-    sort_order INTEGER NOT NULL DEFAULT 0
+    id                  TEXT PRIMARY KEY,
+    form_id             TEXT NOT NULL REFERENCES form(id) ON DELETE CASCADE,
+    name                TEXT NOT NULL,
+    axis_x_id           TEXT NOT NULL REFERENCES scalar_parameter(id) ON DELETE CASCADE,
+    axis_y_id           TEXT NOT NULL REFERENCES scalar_parameter(id) ON DELETE CASCADE,
+    sort_order          INTEGER NOT NULL DEFAULT 0,
+    clear_after_submit  INTEGER NOT NULL DEFAULT 1
+  );
+
+  CREATE TABLE IF NOT EXISTS seed_meta (
+    key   TEXT PRIMARY KEY NOT NULL,
+    value TEXT NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS session (
