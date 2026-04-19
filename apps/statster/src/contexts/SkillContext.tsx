@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import * as metaDb from '../db/meta';
 import { openSkillDb } from '../db/skillDb';
+// getSkillDb() is available for other modules once openSkillDb has been called
 import { Colors, Typography } from '../constants/theme';
 
 export type Skill = {
