@@ -1,8 +1,9 @@
+import { randomUUID } from 'expo-crypto';
 import { getSkillDb } from './skillDb';
 import type { Form, FormGrid2D, FormParam } from './types';
 
 function uid(): string {
-  return crypto.randomUUID();
+  return randomUUID();
 }
 
 function now(): string {

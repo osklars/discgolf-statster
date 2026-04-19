@@ -1,3 +1,4 @@
+import { randomUUID } from 'expo-crypto';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -89,7 +90,7 @@ export function EntryForm({ onBack, entryCount = 0, onLogThrow }: EntryFormProps
         async (name) => {
           if (!name?.trim()) return;
           const newDef: FormDefinition = {
-            id: crypto.randomUUID(),
+            id: randomUUID(),
             name: name.trim(),
             params: draft,
           };

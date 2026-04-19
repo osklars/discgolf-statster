@@ -1,8 +1,9 @@
+import { randomUUID } from 'expo-crypto';
 import { getSkillDb } from './skillDb';
 import type { DatapointsForEntry, NamedDatapoint, ScalarDatapoint } from './types';
 
 function uid(): string {
-  return crypto.randomUUID();
+  return randomUUID();
 }
 
 type ScalarRow = { id: string; entry_id: string; parameter_id: string; value: number };
