@@ -72,7 +72,7 @@ CREATE TABLE entries (
   id         TEXT PRIMARY KEY,
   session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
   form_id    TEXT NOT NULL,
-  values     TEXT NOT NULL,    -- JSON: { [paramId]: string }
+  data       TEXT NOT NULL,    -- JSON: { [paramId]: string }
   logged_at  INTEGER NOT NULL
 );
 ```

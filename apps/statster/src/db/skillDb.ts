@@ -50,7 +50,7 @@ export async function openSkillDb(dbFile: string): Promise<SQLite.SQLiteDatabase
       id         TEXT PRIMARY KEY,
       session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
       form_id    TEXT NOT NULL,
-      values     TEXT NOT NULL,
+      data       TEXT NOT NULL,
       logged_at  INTEGER NOT NULL
     );
   `);
