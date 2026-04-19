@@ -12,6 +12,7 @@ export const SKILL_DB_SCHEMA = `
     unit       TEXT,
     lbl_min    TEXT NOT NULL,
     lbl_max    TEXT NOT NULL,
+    target     REAL,
     created_at TEXT NOT NULL
   );
 

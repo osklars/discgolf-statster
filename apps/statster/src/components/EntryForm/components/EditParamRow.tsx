@@ -11,6 +11,7 @@ interface Props {
   combineSourceAsX: boolean; // true = left half (source→X) highlighted
   onRemove: () => void;
   onOpenSettings: () => void;
+  onToggleSticky: () => void;
   onLayout: (contentY: number, height: number) => void;
   onDragHandleGrant: (pageY: number, pageX: number) => void;
   onDragHandleMove: (pageY: number, pageX: number) => void;
@@ -21,6 +22,7 @@ const TYPE_LABELS: Record<Param['type'], string> = {
   scalar: 'scalar',
   named: 'named',
   grid2d: '2D',
+  quality: 'quality',
 };
 
 export function EditParamRow({
@@ -30,11 +32,13 @@ export function EditParamRow({
   combineSourceAsX,
   onRemove,
   onOpenSettings,
+  onToggleSticky,
   onLayout,
   onDragHandleGrant,
   onDragHandleMove,
   onDragHandleRelease,
 }: Props) {
+  const isSticky = param.clearAfterSubmit === false;
   // Keep latest callbacks in a ref so the PanResponder closure is never stale
   const cbRef = useRef({ onDragHandleGrant, onDragHandleMove, onDragHandleRelease });
   cbRef.current = { onDragHandleGrant, onDragHandleMove, onDragHandleRelease };
@@ -70,6 +74,11 @@ export function EditParamRow({
         </Text>
         <Text style={styles.typeBadge}>{TYPE_LABELS[param.type]}</Text>
       </View>
+
+      {/* Sticky toggle */}
+      <TouchableOpacity onPress={onToggleSticky} hitSlop={HIT_SLOP} style={styles.stickyBtn}>
+        <Feather name={isSticky ? 'lock' : 'unlock'} size={14} color={isSticky ? Colors.primary : Colors.textDisabled} />
+      </TouchableOpacity>
 
       {/* Settings */}
       <TouchableOpacity onPress={onOpenSettings} hitSlop={HIT_SLOP} style={styles.settingsBtn}>
@@ -144,6 +153,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
+  },
+  stickyBtn: {
+    width: 36,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   settingsBtn: {
     width: 40,

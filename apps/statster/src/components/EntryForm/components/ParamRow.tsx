@@ -7,7 +7,7 @@ import {
   Typography,
   hairline,
 } from '../../../constants/theme';
-import type { Grid2DParam, NamedParam, Param, ParamValue, ScalarParam } from '../types';
+import type { Grid2DParam, NamedParam, Param, ParamValue, QualityParam, ScalarParam } from '../types';
 import { Grid2DInput } from './inputs/Grid2DInput';
 import { PillPicker } from './inputs/PillPicker';
 import { ScalarInput } from './inputs/ScalarInput';
@@ -84,8 +84,9 @@ export function ParamRow({
 
   const renderInput = () => {
     switch (param.type) {
-      case 'scalar': {
-        const p = param as ScalarParam;
+      case 'scalar':
+      case 'quality': {
+        const p = param as ScalarParam | QualityParam;
         const n = value !== undefined ? parseFloat(value) : undefined;
         return (
           <ScalarInput

@@ -19,7 +19,7 @@ function now(): string {
 type ScalarRow = {
   id: string; name: string; min: number; max: number; step: number;
   major_step: number; unit: string | null; lbl_min: string; lbl_max: string;
-  created_at: string;
+  target: number | null; created_at: string;
 };
 
 type NamedRow = { id: string; name: string; created_at: string };
@@ -33,7 +33,7 @@ function toScalar(r: ScalarRow): ScalarParameter {
   return {
     id: r.id, name: r.name, min: r.min, max: r.max, step: r.step,
     majorStep: r.major_step, unit: r.unit, lblMin: r.lbl_min,
-    lblMax: r.lbl_max, createdAt: r.created_at,
+    lblMax: r.lbl_max, target: r.target ?? null, createdAt: r.created_at,
   };
 }
 
@@ -57,18 +57,21 @@ export async function upsertScalarParameter(
   const param: ScalarParameter = {
     ...input,
     id: input.id ?? uid(),
+    target: input.target ?? null,
     createdAt: now(),
   };
   await db.runAsync(
     `INSERT INTO scalar_parameter
-       (id, name, min, max, step, major_step, unit, lbl_min, lbl_max, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       (id, name, min, max, step, major_step, unit, lbl_min, lbl_max, target, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        name=excluded.name, min=excluded.min, max=excluded.max,
        step=excluded.step, major_step=excluded.major_step,
-       unit=excluded.unit, lbl_min=excluded.lbl_min, lbl_max=excluded.lbl_max`,
+       unit=excluded.unit, lbl_min=excluded.lbl_min, lbl_max=excluded.lbl_max,
+       target=excluded.target`,
     [param.id, param.name, param.min, param.max, param.step,
-     param.majorStep, param.unit ?? null, param.lblMin, param.lblMax, param.createdAt],
+     param.majorStep, param.unit ?? null, param.lblMin, param.lblMax,
+     param.target, param.createdAt],
   );
   return param;
 }

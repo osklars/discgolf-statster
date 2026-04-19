@@ -2,10 +2,10 @@ import React, { useCallback, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
 import { Circle, Line, Svg, Text as SvgText } from 'react-native-svg';
 import { Colors, Spacing, Typography } from '../../../../constants/theme';
-import type { ScalarParam } from '../../types';
+import type { QualityParam, ScalarParam } from '../../types';
 
 interface Props {
-  param: ScalarParam;
+  param: ScalarParam | QualityParam;
   value: number | undefined;
   onDragStart: () => void;
   onLiveUpdate: (value: number) => void;

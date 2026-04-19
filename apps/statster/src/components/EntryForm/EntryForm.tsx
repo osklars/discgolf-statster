@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { Colors, Radius, Spacing, Typography, hairline } from '../../constants/theme';
-import type { FormDefinition, NamedParam, Param, ParamValue, ScalarParam } from './types';
+import type { FormDefinition, NamedParam, Param, ParamValue, QualityParam, ScalarParam } from './types';
 import { ParamRow } from './components/ParamRow';
 import { StickyBar } from './components/StickyBar';
 import { FormHeader } from './components/FormHeader';
@@ -49,7 +49,7 @@ interface EntryFormProps {
 export function EntryForm({ onBack, entryCount = 0, onLogThrow }: EntryFormProps = {}) {
   const [formDefs, setFormDefs] = useState<FormDefinition[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [paramLibrary, setParamLibrary] = useState<(ScalarParam | NamedParam)[]>([]);
+  const [paramLibrary, setParamLibrary] = useState<(ScalarParam | NamedParam | QualityParam)[]>([]);
   const [dbReady, setDbReady] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editKey, setEditKey] = useState(0);
@@ -127,7 +127,7 @@ export function EntryForm({ onBack, entryCount = 0, onLogThrow }: EntryFormProps
           key={editKey}
           formDef={activeDef}
           paramLibrary={paramLibrary}
-          onAddToLibrary={(param) =>
+          onAddToLibrary={(param: ScalarParam | NamedParam | QualityParam) =>
             setParamLibrary((prev) =>
               prev.some((p) => p.id === param.id) ? prev : [...prev, param],
             )
@@ -219,8 +219,8 @@ type DragState = {
 
 interface EditModeProps {
   formDef: FormDefinition;
-  paramLibrary: (ScalarParam | NamedParam)[];
-  onAddToLibrary: (param: ScalarParam | NamedParam) => void;
+  paramLibrary: (ScalarParam | NamedParam | QualityParam)[];
+  onAddToLibrary: (param: ScalarParam | NamedParam | QualityParam) => void;
   onOverwrite: (draft: Param[]) => void;
   onSaveAsNew: (draft: Param[]) => void;
   onCancel: () => void;
@@ -370,6 +370,7 @@ function EditModeContent({
                 combineSourceAsX={combineSourceAsX}
                 onRemove={() => edit.removeParam(param.id)}
                 onOpenSettings={() => edit.openSettings(param)}
+                onToggleSticky={() => edit.toggleStickyParam(param.id)}
                 onLayout={(contentY, height) => {
                   rowContentY.current.set(param.id, contentY);
                   rowHeights.current.set(param.id, height);
@@ -415,8 +416,8 @@ function EditModeContent({
           const isNewParam = edit.settingsTarget === 'new';
           await saveParamToDb(param).catch(console.error);
           edit.saveParam(param);
-          if (isNewParam && (param.type === 'scalar' || param.type === 'named')) {
-            onAddToLibrary(param as ScalarParam | NamedParam);
+          if (isNewParam && (param.type === 'scalar' || param.type === 'named' || param.type === 'quality')) {
+            onAddToLibrary(param as ScalarParam | NamedParam | QualityParam);
           }
         }}
         onDisband={() => {

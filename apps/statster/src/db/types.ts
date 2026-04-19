@@ -8,6 +8,7 @@ export type ScalarParameter = {
   unit: string | null;
   lblMin: string;
   lblMax: string;
+  target: number | null;
   createdAt: string;
 };
 

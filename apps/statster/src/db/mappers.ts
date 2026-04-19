@@ -1,4 +1,4 @@
-import type { Grid2DParam, NamedParam, Param, ParamValue, ScalarParam } from '../components/EntryForm/types';
+import type { Grid2DParam, NamedParam, Param, ParamValue, QualityParam, ScalarParam } from '../components/EntryForm/types';
 import type { FormDefinition } from '../components/EntryForm/types';
 import type { NamedOption, NamedParameter, ScalarParameter } from './types';
 import {
@@ -16,12 +16,16 @@ const GRID2D_SEP = '·';
 
 // ─── DB → EntryForm type conversions ─────────────────────────────────────────
 
-function dbToScalarParam(s: ScalarParameter): ScalarParam {
-  return {
-    id: s.id, name: s.name, type: 'scalar',
+function dbToScalarParam(s: ScalarParameter): ScalarParam | QualityParam {
+  const base = {
+    id: s.id, name: s.name,
     min: s.min, max: s.max, step: s.step, majorStep: s.majorStep,
     unit: s.unit ?? undefined, lblMin: s.lblMin, lblMax: s.lblMax,
   };
+  if (s.target !== null) {
+    return { ...base, type: 'quality' as const, target: s.target };
+  }
+  return { ...base, type: 'scalar' as const };
 }
 
 function dbToNamedParam(n: NamedParameter, options: NamedOption[]): NamedParam {
@@ -37,7 +41,7 @@ function dbToNamedParam(n: NamedParameter, options: NamedOption[]): NamedParam {
 
 export async function loadFormDefinitions(): Promise<{
   forms: FormDefinition[];
-  paramLibrary: (ScalarParam | NamedParam)[];
+  paramLibrary: (ScalarParam | NamedParam | QualityParam)[];
 }> {
   const [allScalars, allNamed, allOptions, dbForms] = await Promise.all([
     getScalarParameters(),
@@ -56,7 +60,7 @@ export async function loadFormDefinitions(): Promise<{
     optionsByParam.set(opt.parameterId, list);
   }
 
-  const paramLibrary: (ScalarParam | NamedParam)[] = [
+  const paramLibrary: (ScalarParam | NamedParam | QualityParam)[] = [
     ...allScalars.map(dbToScalarParam),
     ...allNamed.map((n) => dbToNamedParam(n, optionsByParam.get(n.id) ?? [])),
   ];
@@ -110,11 +114,12 @@ export async function loadFormDefinitions(): Promise<{
 // ─── Save a param to DB ───────────────────────────────────────────────────────
 
 export async function saveParamToDb(param: Param): Promise<void> {
-  if (param.type === 'scalar') {
+  if (param.type === 'scalar' || param.type === 'quality') {
     await upsertScalarParameter({
       id: param.id, name: param.name,
       min: param.min, max: param.max, step: param.step, majorStep: param.majorStep,
       unit: param.unit ?? null, lblMin: param.lblMin, lblMax: param.lblMax,
+      target: param.type === 'quality' ? param.target : null,
     });
   } else if (param.type === 'named') {
     await upsertNamedParameter({ id: param.id, name: param.name });
@@ -142,9 +147,10 @@ export async function saveFormDefinitionToDb(formDef: FormDefinition): Promise<v
   await saveFormLayout(
     formDef.id,
     formDef.params.map((p, i) => {
-      if (p.type === 'scalar') return { type: 'scalar' as const, paramId: p.id, sortOrder: i };
-      if (p.type === 'named') return { type: 'named' as const, paramId: p.id, sortOrder: i };
-      return { type: 'grid2d' as const, id: p.id, name: p.name, axisXId: p.axisX.id, axisYId: p.axisY.id, sortOrder: i };
+      const cas = p.clearAfterSubmit;
+      if (p.type === 'scalar' || p.type === 'quality') return { type: 'scalar' as const, paramId: p.id, sortOrder: i, clearAfterSubmit: cas };
+      if (p.type === 'named') return { type: 'named' as const, paramId: p.id, sortOrder: i, clearAfterSubmit: cas };
+      return { type: 'grid2d' as const, id: p.id, name: p.name, axisXId: p.axisX.id, axisYId: p.axisY.id, sortOrder: i, clearAfterSubmit: cas };
     }),
   );
 }
@@ -162,7 +168,7 @@ export function formValuesToDatapoints(
     const val = values[param.id];
     if (val === undefined || val === '') continue;
 
-    if (param.type === 'scalar') {
+    if (param.type === 'scalar' || param.type === 'quality') {
       const n = parseFloat(val);
       if (!isNaN(n)) scalars.push({ parameterId: param.id, value: n });
     } else if (param.type === 'named') {

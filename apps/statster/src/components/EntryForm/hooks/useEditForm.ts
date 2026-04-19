@@ -103,6 +103,14 @@ export function useEditForm(initial: FormDefinition) {
     setSettingsTarget(null);
   }, []);
 
+  const toggleStickyParam = useCallback((id: string) => {
+    setDraft((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, clearAfterSubmit: p.clearAfterSubmit === false ? true : false } : p,
+      ),
+    );
+  }, []);
+
   const reorderTo = useCallback((id: string, toIndex: number) => {
     setDraft((prev) => {
       const fromIdx = prev.findIndex((p) => p.id === id);
@@ -135,6 +143,7 @@ export function useEditForm(initial: FormDefinition) {
     moveDown,
     removeParam,
     saveParam,
+    toggleStickyParam,
     startCombine,
     commitCombine,
     splitGrid2D,
