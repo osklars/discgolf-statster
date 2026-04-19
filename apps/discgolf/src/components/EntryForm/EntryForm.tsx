@@ -175,7 +175,11 @@ function getParamIdsInDraft(draft: Param[]): Set<string> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function EntryForm() {
+interface EntryFormProps {
+  onBack?: () => void;
+}
+
+export function EntryForm({ onBack }: EntryFormProps = {}) {
   const [formDefs, setFormDefs] = useState<FormDefinition[]>([PRACTICE_ROUND]);
   const [activeId, setActiveId] = useState(PRACTICE_ROUND.id);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -245,7 +249,7 @@ export function EntryForm() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <View style={styles.root}>
-      <FormHeader name={activeDef.name} isEditMode={isEditMode} onEditPress={enterEdit} />
+      <FormHeader name={activeDef.name} isEditMode={isEditMode} onEditPress={enterEdit} onBack={onBack} />
 
       {!isEditMode && (
         <FormTabs defs={formDefs} activeId={activeId} onSelect={setActiveId} />

@@ -8,13 +8,12 @@ import { Colors } from '../constants/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SessionForm'>;
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function SessionFormScreen(_props: Props) {
+export function SessionFormScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <EntryForm />
+      <EntryForm onBack={() => navigation.goBack()} />
     </View>
   );
 }

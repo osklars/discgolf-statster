@@ -7,11 +7,17 @@ interface Props {
   name: string;
   isEditMode: boolean;
   onEditPress: () => void;
+  onBack?: () => void;
 }
 
-export function FormHeader({ name, isEditMode, onEditPress }: Props) {
+export function FormHeader({ name, isEditMode, onEditPress, onBack }: Props) {
   return (
     <View style={styles.container}>
+      {onBack && (
+        <TouchableOpacity onPress={onBack} activeOpacity={0.6} style={styles.backBtn}>
+          <Feather name="chevron-left" size={24} color={Colors.primary} />
+        </TouchableOpacity>
+      )}
       <Text style={styles.name}>{name}</Text>
       {!isEditMode && (
         <TouchableOpacity onPress={onEditPress} activeOpacity={0.6} style={styles.editBtn}>
@@ -31,6 +37,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: hairline,
     borderBottomColor: Colors.separator,
     backgroundColor: Colors.background,
+  },
+  backBtn: {
+    paddingVertical: Spacing.xs,
+    paddingRight: Spacing.xs,
+    marginLeft: -Spacing.xs,
   },
   name: {
     ...Typography.title,
