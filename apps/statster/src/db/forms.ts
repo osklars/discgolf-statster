@@ -1,5 +1,5 @@
 import { getSkillDb } from './skillDb';
-import type { Form, FormParam } from './types';
+import type { Form, FormGrid2D, FormParam } from './types';
 
 function uid(): string {
   return crypto.randomUUID();
@@ -11,6 +11,10 @@ function now(): string {
 
 type FormRow = { id: string; name: string; sort_order: number; created_at: string };
 type FormParamRow = { form_id: string; param_id: string; param_type: string; sort_order: number };
+type Grid2DRow = {
+  id: string; form_id: string; name: string;
+  axis_x_id: string; axis_y_id: string; sort_order: number;
+};
 
 function toForm(r: FormRow): Form {
   return { id: r.id, name: r.name, sortOrder: r.sort_order, createdAt: r.created_at };
@@ -22,6 +26,13 @@ function toFormParam(r: FormParamRow): FormParam {
     paramId: r.param_id,
     paramType: r.param_type as 'scalar' | 'named',
     sortOrder: r.sort_order,
+  };
+}
+
+function toGrid2D(r: Grid2DRow): FormGrid2D {
+  return {
+    id: r.id, formId: r.form_id, name: r.name,
+    axisXId: r.axis_x_id, axisYId: r.axis_y_id, sortOrder: r.sort_order,
   };
 }
 
@@ -57,15 +68,37 @@ export async function getFormParams(formId: string): Promise<FormParam[]> {
   return rows.map(toFormParam);
 }
 
-export async function setFormParams(formId: string, params: Omit<FormParam, 'formId'>[]): Promise<void> {
+export async function getFormGrid2Ds(formId: string): Promise<FormGrid2D[]> {
+  const rows = await getSkillDb().getAllAsync<Grid2DRow>(
+    'SELECT * FROM form_grid2d WHERE form_id = ? ORDER BY sort_order ASC',
+    [formId],
+  );
+  return rows.map(toGrid2D);
+}
+
+export type LayoutEntry =
+  | { type: 'scalar'; paramId: string; sortOrder: number }
+  | { type: 'named'; paramId: string; sortOrder: number }
+  | { type: 'grid2d'; id: string; name: string; axisXId: string; axisYId: string; sortOrder: number };
+
+export async function saveFormLayout(formId: string, entries: LayoutEntry[]): Promise<void> {
   const db = getSkillDb();
   await db.withTransactionAsync(async () => {
     await db.runAsync('DELETE FROM form_param WHERE form_id = ?', [formId]);
-    for (const p of params) {
-      await db.runAsync(
-        'INSERT INTO form_param (form_id, param_id, param_type, sort_order) VALUES (?, ?, ?, ?)',
-        [formId, p.paramId, p.paramType, p.sortOrder],
-      );
+    await db.runAsync('DELETE FROM form_grid2d WHERE form_id = ?', [formId]);
+    for (const e of entries) {
+      if (e.type === 'scalar' || e.type === 'named') {
+        await db.runAsync(
+          'INSERT INTO form_param (form_id, param_id, param_type, sort_order) VALUES (?, ?, ?, ?)',
+          [formId, e.paramId, e.type, e.sortOrder],
+        );
+      } else {
+        await db.runAsync(
+          `INSERT INTO form_grid2d (id, form_id, name, axis_x_id, axis_y_id, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [e.id, formId, e.name, e.axisXId, e.axisYId, e.sortOrder],
+        );
+      }
     }
   });
 }

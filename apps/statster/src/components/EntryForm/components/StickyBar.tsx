@@ -1,39 +1,19 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import {
-  Colors,
-  MIN_HIT,
-  Radius,
-  Spacing,
-  Typography,
-  hairline,
-} from '../../../constants/theme';
-
-interface HoleContext {
-  holeNumber: number;
-  distanceM: number;
-  par: number;
-  throwNumber: number;
-}
+import { Colors, MIN_HIT, Radius, Spacing, Typography, hairline } from '../../../constants/theme';
 
 interface Props {
-  holeContext: HoleContext;
+  entryCount: number;
   onAction: () => void;
 }
 
-export function StickyBar({ holeContext, onAction }: Props) {
-  const { holeNumber, distanceM, par, throwNumber } = holeContext;
-
+export function StickyBar({ entryCount, onAction }: Props) {
   return (
     <View style={styles.container}>
-      <Text style={styles.holeInfo}>
-        {`Hole ${holeNumber} · ${distanceM}m · par ${par} · throw ${throwNumber}`}
-      </Text>
-      <TouchableOpacity
-        style={styles.button}
-        onPress={onAction}
-        activeOpacity={0.8}
-      >
+      {entryCount > 0 && (
+        <Text style={styles.countLabel}>{entryCount} logged this session</Text>
+      )}
+      <TouchableOpacity style={styles.button} onPress={onAction} activeOpacity={0.8}>
         <Text style={styles.buttonLabel}>Log throw</Text>
       </TouchableOpacity>
     </View>
@@ -48,12 +28,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.xl,
+    gap: Spacing.sm,
   },
-  holeInfo: {
+  countLabel: {
     ...Typography.labelSm,
     color: Colors.textMuted,
     textAlign: 'center',
-    marginBottom: Spacing.sm,
   },
   button: {
     backgroundColor: Colors.primary,

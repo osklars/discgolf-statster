@@ -140,3 +140,10 @@ export async function archiveNamedOption(id: string): Promise<void> {
     [now(), id],
   );
 }
+
+export async function getAllNamedOptions(): Promise<NamedOption[]> {
+  const rows = await getSkillDb().getAllAsync<OptionRow>(
+    'SELECT * FROM named_option ORDER BY parameter_id, sort_order ASC',
+  );
+  return rows.map(toOption);
+}

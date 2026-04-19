@@ -1,7 +1,16 @@
-import React, { useCallback, useRef, useState } from 'react';
-import { Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Colors, Radius, Spacing, Typography, hairline } from '../../constants/theme';
-import type { FormDefinition, NamedParam, Param, ScalarParam } from './types';
+import type { FormDefinition, NamedParam, Param, ParamValue, ScalarParam } from './types';
 import { ParamRow } from './components/ParamRow';
 import { StickyBar } from './components/StickyBar';
 import { FormHeader } from './components/FormHeader';
@@ -11,154 +20,9 @@ import { ParamSettingsSheet } from './components/ParamSettingsSheet';
 import { AddParamSheet } from './components/AddParamSheet';
 import { useEntryForm } from './hooks/useEntryForm';
 import { useEditForm } from './hooks/useEditForm';
+import { loadFormDefinitions, saveFormDefinitionToDb, saveParamToDb } from '../../db/mappers';
 
-// ─── Initial form definition ──────────────────────────────────────────────────
-
-const PRACTICE_ROUND: FormDefinition = {
-  id: 'practice_round',
-  name: 'Practice round',
-  params: [
-    {
-      id: 'disc',
-      name: 'Disc',
-      type: 'named',
-      options: [
-        { id: 'd1', label: 'Destroyer' },
-        { id: 'd2', label: 'Buzzz' },
-        { id: 'd3', label: 'Luna' },
-        { id: 'd4', label: 'Roc3' },
-        { id: 'd5', label: 'Wraith' },
-        { id: 'd6', label: 'Aviar' },
-      ],
-    },
-    {
-      id: 'hand',
-      name: 'Hand',
-      type: 'named',
-      options: [
-        { id: 'bh', label: 'Backhand' },
-        { id: 'fh', label: 'Forehand' },
-      ],
-    },
-    {
-      id: 'lie',
-      name: 'Lie',
-      type: 'named',
-      options: [
-        { id: 'tee', label: 'Tee' },
-        { id: 'fair', label: 'Fairway' },
-        { id: 'scr', label: 'Scramble' },
-        { id: 'app', label: 'Approach' },
-        { id: 'putt', label: 'Putt' },
-      ],
-    },
-    {
-      id: 'diff',
-      name: 'Difficulty',
-      type: 'scalar',
-      min: 1,
-      max: 10,
-      step: 1,
-      majorStep: 1,
-      lblMin: 'easy',
-      lblMax: 'hard',
-    },
-    {
-      id: 'hyzer_i',
-      name: 'Hyzer (intended)',
-      type: 'scalar',
-      min: -5,
-      max: 5,
-      step: 1,
-      majorStep: 1,
-      lblMin: 'hyzer',
-      lblMax: 'anhyzer',
-    },
-    {
-      id: 'nose_i',
-      name: 'Nose (intended)',
-      type: 'scalar',
-      min: -5,
-      max: 5,
-      step: 1,
-      majorStep: 1,
-      lblMin: 'nose ↓',
-      lblMax: 'nose ↑',
-    },
-    {
-      id: 'exec',
-      name: 'Execution',
-      type: 'scalar',
-      min: 1,
-      max: 10,
-      step: 1,
-      majorStep: 1,
-      lblMin: 'shank',
-      lblMax: 'pured',
-    },
-    {
-      id: 'throw_dist',
-      name: 'Distance',
-      type: 'scalar',
-      min: 0,
-      max: 200,
-      step: 5,
-      majorStep: 50,
-      unit: 'm',
-      lblMin: '0m',
-      lblMax: '200m',
-    },
-    {
-      id: 'height',
-      name: 'Height',
-      type: 'scalar',
-      min: -2,
-      max: 2,
-      step: 1,
-      majorStep: 1,
-      lblMin: 'low',
-      lblMax: 'high',
-    },
-    {
-      id: 'line',
-      name: 'Line',
-      type: 'scalar',
-      min: -2,
-      max: 2,
-      step: 1,
-      majorStep: 1,
-      lblMin: 'early',
-      lblMax: 'pulled',
-    },
-    {
-      id: 'form',
-      name: 'Form',
-      type: 'scalar',
-      min: -2,
-      max: 2,
-      step: 1,
-      majorStep: 1,
-      lblMin: 'strenuous',
-      lblMax: 'smooth',
-    },
-  ],
-};
-
-const DEMO_HOLE = { holeNumber: 4, distanceM: 152, par: 3, throwNumber: 2 };
-
-// ─── Library helpers ──────────────────────────────────────────────────────────
-
-function extractLibraryParams(params: Param[]): (ScalarParam | NamedParam)[] {
-  const result: (ScalarParam | NamedParam)[] = [];
-  for (const p of params) {
-    if (p.type === 'grid2d') {
-      result.push(p.axisX, p.axisY);
-    } else {
-      result.push(p as ScalarParam | NamedParam);
-    }
-  }
-  return result;
-}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getParamIdsInDraft(draft: Param[]): Set<string> {
   const ids = new Set<string>();
@@ -173,54 +37,48 @@ function getParamIdsInDraft(draft: Param[]): Set<string> {
   return ids;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Main component ───────────────────────────────────────────────────────────
 
 interface EntryFormProps {
   onBack?: () => void;
+  entryCount?: number;
+  onLogThrow?: (formId: string, params: Param[], values: Record<string, ParamValue>) => Promise<void>;
 }
 
-export function EntryForm({ onBack }: EntryFormProps = {}) {
-  const [formDefs, setFormDefs] = useState<FormDefinition[]>([PRACTICE_ROUND]);
-  const [activeId, setActiveId] = useState(PRACTICE_ROUND.id);
+export function EntryForm({ onBack, entryCount = 0, onLogThrow }: EntryFormProps = {}) {
+  const [formDefs, setFormDefs] = useState<FormDefinition[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [paramLibrary, setParamLibrary] = useState<(ScalarParam | NamedParam)[]>([]);
+  const [dbReady, setDbReady] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [paramLibrary, setParamLibrary] = useState<(ScalarParam | NamedParam)[]>(() =>
-    extractLibraryParams(PRACTICE_ROUND.params),
-  );
-  // Increment to force-remount the edit form and reset its state
   const [editKey, setEditKey] = useState(0);
+
+  useEffect(() => {
+    loadFormDefinitions()
+      .then(({ forms, paramLibrary: lib }) => {
+        setFormDefs(forms);
+        setActiveId(forms[0]?.id ?? null);
+        setParamLibrary(lib);
+        setDbReady(true);
+      })
+      .catch(console.error);
+  }, []);
 
   const activeDef = formDefs.find((f) => f.id === activeId) ?? formDefs[0];
 
-  // ── View mode ──────────────────────────────────────────────────────────────
-  const form = useEntryForm(activeDef.params);
-  const scrollRef = useRef<ScrollView>(null);
-
-  const handleDragStart = useCallback(() => {
-    scrollRef.current?.setNativeProps({ scrollEnabled: false });
-  }, []);
-
-  const wrapCommit = useCallback(
-    (paramId: string, value: string) => {
-      scrollRef.current?.setNativeProps({ scrollEnabled: true });
-      form.setValue(paramId, value);
-    },
-    [form],
-  );
-
-  // ── Edit mode ──────────────────────────────────────────────────────────────
   const enterEdit = () => {
     setEditKey((k) => k + 1);
     setIsEditMode(true);
   };
 
   const handleOverwrite = useCallback(
-    (draft: Param[]) => {
-      setFormDefs((prev) =>
-        prev.map((f) => (f.id === activeDef.id ? { ...f, params: draft } : f)),
-      );
+    async (draft: Param[]) => {
+      const updated = { ...activeDef, params: draft };
+      await saveFormDefinitionToDb(updated);
+      setFormDefs((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
       setIsEditMode(false);
     },
-    [activeDef.id],
+    [activeDef],
   );
 
   const handleSaveAsNew = useCallback(
@@ -228,31 +86,39 @@ export function EntryForm({ onBack }: EntryFormProps = {}) {
       Alert.prompt(
         'Save as new',
         'Enter a name for the new form',
-        (name) => {
+        async (name) => {
           if (!name?.trim()) return;
           const newDef: FormDefinition = {
-            id: `form_${Date.now()}`,
+            id: crypto.randomUUID(),
             name: name.trim(),
             params: draft,
           };
+          await saveFormDefinitionToDb(newDef);
           setFormDefs((prev) => [...prev, newDef]);
           setActiveId(newDef.id);
           setIsEditMode(false);
         },
         'plain-text',
-        activeDef.name,
+        activeDef?.name,
       );
     },
-    [activeDef.name],
+    [activeDef?.name],
   );
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  if (!dbReady || !activeDef) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
       <FormHeader name={activeDef.name} isEditMode={isEditMode} onEditPress={enterEdit} onBack={onBack} />
 
       {!isEditMode && (
-        <FormTabs defs={formDefs} activeId={activeId} onSelect={setActiveId} />
+        <FormTabs defs={formDefs} activeId={activeId!} onSelect={setActiveId} />
       )}
 
       {isEditMode ? (
@@ -270,35 +136,73 @@ export function EntryForm({ onBack }: EntryFormProps = {}) {
           onCancel={() => setIsEditMode(false)}
         />
       ) : (
-        <>
-          <ScrollView
-            ref={scrollRef}
-            style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-          >
-            {form.params.map((param) => (
-              <ParamRow
-                key={param.id}
-                param={param}
-                value={form.values[param.id]}
-                isExpanded={form.expandedIds.has(param.id)}
-                onToggle={() => form.toggleExpanded(param.id)}
-                onCommit={(v) => wrapCommit(param.id, v)}
-                onClear={() => form.clearValue(param.id)}
-                formatValue={form.formatValue}
-                onDragStart={handleDragStart}
-              />
-            ))}
-          </ScrollView>
-
-          <StickyBar
-            holeContext={DEMO_HOLE}
-            onAction={() => console.log('Log throw', form.values)}
-          />
-        </>
+        <ViewModeContent
+          key={activeId!}
+          formDef={activeDef}
+          entryCount={entryCount}
+          onLogThrow={onLogThrow}
+        />
       )}
     </View>
+  );
+}
+
+// ─── View mode sub-component ──────────────────────────────────────────────────
+// Keyed by activeId so form values reset when switching forms.
+
+interface ViewModeProps {
+  formDef: FormDefinition;
+  entryCount: number;
+  onLogThrow?: EntryFormProps['onLogThrow'];
+}
+
+function ViewModeContent({ formDef, entryCount, onLogThrow }: ViewModeProps) {
+  const form = useEntryForm(formDef.params);
+  const scrollRef = useRef<ScrollView>(null);
+
+  const handleDragStart = useCallback(() => {
+    scrollRef.current?.setNativeProps({ scrollEnabled: false });
+  }, []);
+
+  const wrapCommit = useCallback(
+    (paramId: string, value: string) => {
+      scrollRef.current?.setNativeProps({ scrollEnabled: true });
+      form.setValue(paramId, value);
+    },
+    [form],
+  );
+
+  const handleLogThrow = useCallback(async () => {
+    if (onLogThrow) {
+      await onLogThrow(formDef.id, formDef.params, form.values);
+    }
+    form.clearAll();
+  }, [onLogThrow, formDef, form]);
+
+  return (
+    <>
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {form.params.map((param) => (
+          <ParamRow
+            key={param.id}
+            param={param}
+            value={form.values[param.id]}
+            isExpanded={form.expandedIds.has(param.id)}
+            onToggle={() => form.toggleExpanded(param.id)}
+            onCommit={(v) => wrapCommit(param.id, v)}
+            onClear={() => form.clearValue(param.id)}
+            formatValue={form.formatValue}
+            onDragStart={handleDragStart}
+          />
+        ))}
+      </ScrollView>
+      <StickyBar entryCount={entryCount} onAction={handleLogThrow} />
+    </>
   );
 }
 
@@ -306,9 +210,9 @@ export function EntryForm({ onBack }: EntryFormProps = {}) {
 
 type DragState = {
   paramId: string;
-  pageY: number;  // current touch screen Y
-  pageX: number;  // current touch screen X
-  offsetY: number; // touch Y - row top screen Y (captured at drag start)
+  pageY: number;
+  pageX: number;
+  offsetY: number;
   rowHeight: number;
 };
 
@@ -332,23 +236,18 @@ function EditModeContent({
   const edit = useEditForm(formDef);
   const [showAddSheet, setShowAddSheet] = useState(false);
 
-  // ── Drag state ─────────────────────────────────────────────────────────────
   const [drag, setDragState] = useState<DragState | null>(null);
   const dragRef = useRef<DragState | null>(null);
-  // ── Layout tracking ────────────────────────────────────────────────────────
-  // content Y and height of each row (onLayout y = offset within ScrollView content)
+
   const rowContentY = useRef<Map<string, number>>(new Map());
   const rowHeights = useRef<Map<string, number>>(new Map());
-
   const scrollRef = useRef<ScrollView>(null);
   const scrollY = useRef(0);
   const scrollContainerRef = useRef<View>(null);
   const scrollContainerPageY = useRef(0);
-
   const rootRef = useRef<View>(null);
   const rootPageY = useRef(0);
 
-  // ── Drag handlers (kept in ref so PanResponder closures are never stale) ───
   const editRef = useRef(edit);
   editRef.current = edit;
 
@@ -393,13 +292,11 @@ function EditModeContent({
         const overParam = e.draft.find((p) => p.id === overId);
         if (dragParam?.type === 'scalar' && overParam?.type === 'scalar') {
           const screenWidth = Dimensions.get('window').width;
-          const sourceAsX = d.pageX < screenWidth / 2;
-          e.commitCombine(d.paramId, overId, sourceAsX);
+          e.commitCombine(d.paramId, overId, d.pageX < screenWidth / 2);
           return;
         }
       }
 
-      // Reorder
       let insertIdx = 0;
       for (let i = 0; i < e.draft.length; i++) {
         if (e.draft[i].id === d.paramId) continue;
@@ -413,7 +310,6 @@ function EditModeContent({
     },
   });
 
-  // ── Derived drag info for rendering ───────────────────────────────────────
   const overIdForRender = drag
     ? (() => {
         for (const param of edit.draft) {
@@ -431,23 +327,19 @@ function EditModeContent({
   const dragParam = drag ? edit.draft.find((p) => p.id === drag.paramId) : null;
   const screenWidth = Dimensions.get('window').width;
   const combineSourceAsX = drag ? drag.pageX < screenWidth / 2 : false;
+  const ghostTop = drag ? drag.pageY - drag.offsetY - rootPageY.current : 0;
 
-  // Ghost top position relative to root View
-  const ghostTop = drag
-    ? drag.pageY - drag.offsetY - rootPageY.current
-    : 0;
-
-  // ── Settings sheet ─────────────────────────────────────────────────────────
   const sheetTarget = edit.settingsTarget === 'new' ? null : (edit.settingsTarget ?? null);
   const sheetVisible = edit.settingsTarget !== null;
 
   return (
-    <View ref={rootRef} style={styles.editRoot} onLayout={() => {
-      rootRef.current?.measure((_x, _y, _w, _h, _px, py) => {
-        rootPageY.current = py;
-      });
-    }}>
-      {/* Scroll container — measure once for pageY */}
+    <View
+      ref={rootRef}
+      style={styles.editRoot}
+      onLayout={() => {
+        rootRef.current?.measure((_x, _y, _w, _h, _px, py) => { rootPageY.current = py; });
+      }}
+    >
       <View
         ref={scrollContainerRef}
         style={styles.scroll}
@@ -506,13 +398,10 @@ function EditModeContent({
         onCancel={onCancel}
       />
 
-      {/* Drag ghost — floats above everything, no pointer events */}
       {drag && (
         <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
           <View style={[styles.ghost, { top: ghostTop, height: drag.rowHeight }]}>
-            <Text style={styles.ghostText} numberOfLines={1}>
-              {dragParam?.name ?? ''}
-            </Text>
+            <Text style={styles.ghostText} numberOfLines={1}>{dragParam?.name ?? ''}</Text>
             <Text style={styles.ghostHandle}>≡</Text>
           </View>
         </View>
@@ -521,8 +410,9 @@ function EditModeContent({
       <ParamSettingsSheet
         visible={sheetVisible}
         initial={sheetTarget}
-        onSave={(param) => {
+        onSave={async (param) => {
           const isNewParam = edit.settingsTarget === 'new';
+          await saveParamToDb(param).catch(console.error);
           edit.saveParam(param);
           if (isNewParam && (param.type === 'scalar' || param.type === 'named')) {
             onAddToLibrary(param as ScalarParam | NamedParam);
@@ -535,7 +425,6 @@ function EditModeContent({
         onClose={edit.closeSettings}
       />
 
-      {/* Computed available params: in library but not already in draft */}
       <AddParamSheet
         visible={showAddSheet}
         available={paramLibrary.filter((p) => !getParamIdsInDraft(edit.draft).has(p.id))}
@@ -558,7 +447,7 @@ function EditModeContent({
 interface FormTabsProps {
   defs: FormDefinition[];
   activeId: string;
-  onSelect: (id: string) => void;
+  onSelect: (id: string | null) => void;
 }
 
 function FormTabs({ defs, activeId, onSelect }: FormTabsProps) {
@@ -595,6 +484,12 @@ function FormTabs({ defs, activeId, onSelect }: FormTabsProps) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    backgroundColor: Colors.background,
+  },
+  loading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: Colors.background,
   },
   editRoot: {

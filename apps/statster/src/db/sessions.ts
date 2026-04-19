@@ -1,5 +1,5 @@
 import { getSkillDb } from './skillDb';
-import type { Session } from './types';
+import type { Session, SessionSummary } from './types';
 
 function uid(): string {
   return crypto.randomUUID();
@@ -52,4 +52,15 @@ export async function getSession(id: string): Promise<Session | null> {
     'SELECT * FROM session WHERE id = ?', [id],
   );
   return row ? toSession(row) : null;
+}
+
+export async function getSessionsWithEntryCounts(): Promise<SessionSummary[]> {
+  const rows = await getSkillDb().getAllAsync<{ id: string; started_at: string; entry_count: number }>(
+    `SELECT s.id, s.started_at, COUNT(e.id) AS entry_count
+     FROM session s
+     LEFT JOIN entry e ON e.session_id = s.id
+     GROUP BY s.id
+     ORDER BY s.started_at DESC`,
+  );
+  return rows.map(r => ({ id: r.id, startedAt: r.started_at, entryCount: r.entry_count }));
 }

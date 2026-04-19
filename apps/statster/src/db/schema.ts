@@ -44,6 +44,15 @@ export const SKILL_DB_SCHEMA = `
     PRIMARY KEY (form_id, param_id)
   );
 
+  CREATE TABLE IF NOT EXISTS form_grid2d (
+    id         TEXT PRIMARY KEY,
+    form_id    TEXT NOT NULL REFERENCES form(id) ON DELETE CASCADE,
+    name       TEXT NOT NULL,
+    axis_x_id  TEXT NOT NULL REFERENCES scalar_parameter(id) ON DELETE CASCADE,
+    axis_y_id  TEXT NOT NULL REFERENCES scalar_parameter(id) ON DELETE CASCADE,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  );
+
   CREATE TABLE IF NOT EXISTS session (
     id          TEXT PRIMARY KEY,
     started_at  TEXT NOT NULL,
@@ -74,6 +83,7 @@ export const SKILL_DB_SCHEMA = `
   );
 
   CREATE INDEX IF NOT EXISTS idx_entry_session        ON entry(session_id);
+  CREATE INDEX IF NOT EXISTS idx_form_grid2d_form     ON form_grid2d(form_id);
   CREATE INDEX IF NOT EXISTS idx_scalar_dp_entry      ON scalar_datapoint(entry_id);
   CREATE INDEX IF NOT EXISTS idx_scalar_dp_param_val  ON scalar_datapoint(parameter_id, value);
   CREATE INDEX IF NOT EXISTS idx_named_dp_entry       ON named_datapoint(entry_id);

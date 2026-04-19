@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -13,7 +13,9 @@ import type { RootStackParamList } from '../navigation/types';
 import { Colors, Radius, Spacing, Typography, hairline } from '../constants/theme';
 import { useSkill } from '../contexts/SkillContext';
 import { SkillSwitcherSheet } from '../components/SkillSwitcher/SkillSwitcherSheet';
-import { MOCK_SESSIONS, MOCK_STATS } from './mockData';
+import { MOCK_STATS } from './mockData';
+import type { SessionSummary } from '../db/types';
+import { getSessionsWithEntryCounts } from '../db/sessions';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -49,8 +51,21 @@ export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { activeSkill } = useSkill();
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const overall = MOCK_STATS[0];
   const recentLevelUps = MOCK_STATS.filter((s) => s.recentLevelUp !== null && s.name !== 'Overall');
+
+  const loadSessions = useCallback(() => {
+    getSessionsWithEntryCounts().then(setSessions).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
+
+  useEffect(() => {
+    return navigation.addListener('focus', loadSessions);
+  }, [navigation, loadSessions]);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -121,7 +136,11 @@ export function HomeScreen({ navigation }: Props) {
         {/* Recent sessions */}
         <Text style={styles.sectionTitle}>Recent sessions</Text>
 
-        {MOCK_SESSIONS.map((session) => (
+        {sessions.length === 0 && (
+          <Text style={styles.emptyLabel}>No sessions yet. Start one below!</Text>
+        )}
+
+        {sessions.map((session) => (
           <TouchableOpacity
             key={session.id}
             activeOpacity={0.7}
@@ -129,12 +148,12 @@ export function HomeScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('Session', { sessionId: session.id })}
           >
             <View style={styles.sessionCardLeft}>
-              <Text style={styles.sessionCourse}>{session.courseName}</Text>
+              <Text style={styles.sessionCourse}>Session</Text>
               <Text style={styles.sessionMeta}>
-                {session.entries.length} {session.entries.length === 1 ? 'throw' : 'throws'}
+                {session.entryCount} {session.entryCount === 1 ? 'throw' : 'throws'}
               </Text>
             </View>
-            <Text style={styles.sessionDate}>{formatDate(session.date)}</Text>
+            <Text style={styles.sessionDate}>{formatDate(session.startedAt)}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -290,6 +309,12 @@ const styles = StyleSheet.create({
   sessionDate: {
     ...Typography.label,
     color: Colors.textMuted,
+  },
+  emptyLabel: {
+    ...Typography.label,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    paddingVertical: Spacing.lg,
   },
   stickyBar: {
     paddingHorizontal: Spacing.lg,

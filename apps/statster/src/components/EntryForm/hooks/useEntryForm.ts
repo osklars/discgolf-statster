@@ -11,6 +11,7 @@ export function useEntryForm(params: Param[]): EntryFormState & {
   toggleExpanded: (id: string) => void;
   setValue: (id: string, value: ParamValue) => void;
   clearValue: (id: string) => void;
+  clearAll: () => void;
   formatValue: (param: Param, raw: ParamValue | undefined) => string;
 } {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
@@ -88,5 +89,7 @@ export function useEntryForm(params: Param[]): EntryFormState & {
     [],
   );
 
-  return { expandedIds, values, params, toggleExpanded, setValue, clearValue, formatValue };
+  const clearAll = useCallback(() => setValues({}), []);
+
+  return { expandedIds, values, params, toggleExpanded, setValue, clearValue, clearAll, formatValue };
 }

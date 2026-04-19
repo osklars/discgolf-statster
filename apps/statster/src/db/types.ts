@@ -39,11 +39,26 @@ export type FormParam = {
   sortOrder: number;
 };
 
+export type FormGrid2D = {
+  id: string;
+  formId: string;
+  name: string;
+  axisXId: string;
+  axisYId: string;
+  sortOrder: number;
+};
+
 export type Session = {
   id: string;
   startedAt: string;
   finishedAt: string | null;
   notes: string | null;
+};
+
+export type SessionSummary = {
+  id: string;
+  startedAt: string;
+  entryCount: number;
 };
 
 export type Entry = {

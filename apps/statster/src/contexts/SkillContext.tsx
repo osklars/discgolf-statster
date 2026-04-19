@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import * as metaDb from '../db/meta';
 import { openSkillDb } from '../db/skillDb';
-// getSkillDb() is available for other modules once openSkillDb has been called
+import { seedIfEmpty } from '../db/seed';
 import { Colors, Typography } from '../constants/theme';
 
 export type Skill = {
@@ -51,6 +51,7 @@ export function SkillProvider({ children }: { children: React.ReactNode }) {
 
         const active = allSkills.find((s) => s.id === initialId) ?? allSkills[0];
         await openSkillDb(active.dbFile);
+        await seedIfEmpty();
 
         setSkills(allSkills);
         setActiveId(initialId);
@@ -70,6 +71,7 @@ export function SkillProvider({ children }: { children: React.ReactNode }) {
       const skill = skills.find((s) => s.id === id);
       if (!skill) return;
       await openSkillDb(skill.dbFile);
+      await seedIfEmpty();
       await metaDb.setActiveSkillId(id);
       setActiveId(id);
     },
