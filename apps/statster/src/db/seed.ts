@@ -4,7 +4,7 @@ import { getSkillDb } from './skillDb';
 import { SKILL_DB_SCHEMA } from './schema';
 
 // Bump this any time you want the app to wipe and re-seed on next launch.
-const SEED_VERSION = 4;
+const SEED_VERSION = 5;
 
 const WIPE_DATA_SQL = `
   DROP TABLE IF EXISTS named_datapoint;
@@ -17,6 +17,7 @@ const WIPE_DATA_SQL = `
   DROP TABLE IF EXISTS named_option;
   DROP TABLE IF EXISTS named_parameter;
   DROP TABLE IF EXISTS scalar_parameter;
+  DROP TABLE IF EXISTS saved_level;
 `;
 
 export async function seedIfEmpty(): Promise<void> {
@@ -197,4 +198,13 @@ async function seedDiscGolf(): Promise<void> {
     s('putt_dist', 0),
     s('grade',     1),
   ] satisfies LayoutRow[]);
+
+  // ── Default saved levels ─────────────────────────────────────────────────────
+
+  const db = getSkillDb();
+  const now = new Date().toISOString();
+  await db.runAsync(
+    'INSERT INTO saved_level (id, name, filters, sort_order, created_at) VALUES (?, ?, ?, ?, ?)',
+    ['sl_overall', 'Overall', '[]', 0, now],
+  );
 }

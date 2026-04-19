@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -15,15 +16,12 @@ import type { RootStackParamList } from '../navigation/types';
 import { Colors, MIN_HIT, Radius, Spacing, Typography, hairline } from '../constants/theme';
 import { getNamedParameters, getAllNamedOptions } from '../db/parameters';
 import { getXpWithFilters, xpToLevel, levelThreshold } from '../db/xp';
+import { insertSavedLevel } from '../db/savedLevels';
+import type { SavedLevelFilter } from '../db/savedLevels';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StatDetail'>;
 
-type FilterChip = {
-  parameterId: string;
-  paramName: string;
-  optionId: string;
-  optionLabel: string;
-};
+type FilterChip = SavedLevelFilter;
 
 type NamedParamOption = { id: string; label: string };
 type NamedParamGroup = { id: string; name: string; options: NamedParamOption[] };
@@ -49,14 +47,38 @@ const bar = StyleSheet.create({
   fill: { backgroundColor: Colors.primary, borderRadius: 4 },
 });
 
-export function StatDetailScreen(_props: Props) {
+export function StatDetailScreen({ route, navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const [filters, setFilters] = useState<FilterChip[]>([]);
+  const initialFilters = route.params?.filters ?? [];
+  const [filters, setFilters] = useState<FilterChip[]>(initialFilters);
   const [totalXp, setTotalXp] = useState(0);
   const [entryCount, setEntryCount] = useState(0);
   const [paramGroups, setParamGroups] = useState<NamedParamGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [saveVisible, setSaveVisible] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => {
+            const defaultName =
+              filters.length === 0
+                ? 'Overall'
+                : filters.map((f) => f.optionLabel).join(' + ');
+            setSaveName(defaultName);
+            setSaveVisible(true);
+          }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Feather name="bookmark" size={20} color={Colors.primary} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, filters]);
 
   // Load named param options for the picker once
   useEffect(() => {
@@ -77,7 +99,6 @@ export function StatDetailScreen(_props: Props) {
     loadParams().catch(console.error);
   }, []);
 
-  // Re-query XP whenever filters change
   const reloadXp = useCallback(async (activeFilters: FilterChip[]) => {
     setLoading(true);
     const result = await getXpWithFilters(
@@ -94,7 +115,6 @@ export function StatDetailScreen(_props: Props) {
 
   const addFilter = (chip: FilterChip) => {
     setFilters((prev) => {
-      // Replace existing filter for same param
       const without = prev.filter((f) => f.parameterId !== chip.parameterId);
       return [...without, chip];
     });
@@ -105,10 +125,15 @@ export function StatDetailScreen(_props: Props) {
     setFilters((prev) => prev.filter((f) => f.parameterId !== parameterId));
   };
 
-  const levelInfo = xpToLevel(totalXp);
+  const handleSave = async () => {
+    if (!saveName.trim()) return;
+    setSaving(true);
+    await insertSavedLevel(saveName.trim(), filters);
+    setSaving(false);
+    setSaveVisible(false);
+  };
 
-  // Which params are already filtered (to show as active in picker)
-  const activeParamIds = new Set(filters.map((f) => f.parameterId));
+  const levelInfo = xpToLevel(totalXp);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -196,7 +221,7 @@ export function StatDetailScreen(_props: Props) {
         </View>
       </ScrollView>
 
-      {/* Add filter picker modal */}
+      {/* Filter picker modal */}
       <Modal
         visible={pickerVisible}
         animationType="slide"
@@ -248,6 +273,45 @@ export function StatDetailScreen(_props: Props) {
               <Text style={styles.emptyText}>No named parameters found. Log some throws first.</Text>
             )}
           </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Save level modal */}
+      <Modal
+        visible={saveVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setSaveVisible(false)}
+      >
+        <View style={styles.saveOverlay}>
+          <View style={styles.saveSheet}>
+            <Text style={styles.saveTitle}>Save level</Text>
+            <Text style={styles.saveSubtitle}>
+              {filters.length === 0 ? 'Overall (no filters)' : filters.map((f) => `${f.paramName}: ${f.optionLabel}`).join(', ')}
+            </Text>
+            <TextInput
+              style={styles.saveInput}
+              value={saveName}
+              onChangeText={setSaveName}
+              placeholder="Name"
+              placeholderTextColor={Colors.textDisabled}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleSave}
+            />
+            <View style={styles.saveActions}>
+              <TouchableOpacity style={styles.saveCancelBtn} onPress={() => setSaveVisible(false)}>
+                <Text style={styles.saveCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveConfirmBtn, !saveName.trim() && styles.saveConfirmDisabled]}
+                onPress={handleSave}
+                disabled={!saveName.trim() || saving}
+              >
+                <Text style={styles.saveConfirmText}>{saving ? 'Saving…' : 'Save'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
     </View>
@@ -332,7 +396,7 @@ const styles = StyleSheet.create({
   thresholdLevel: { ...Typography.labelSm, color: Colors.textDisabled, fontWeight: '600' },
   thresholdLevelReached: { color: Colors.primary },
   thresholdXp: { ...Typography.labelSm, color: Colors.textDisabled, fontSize: 10 },
-  // Modal
+  // Filter picker modal
   modalRoot: { flex: 1, backgroundColor: Colors.background },
   modalHeader: {
     flexDirection: 'row',
@@ -367,4 +431,44 @@ const styles = StyleSheet.create({
   optionLabel: { ...Typography.body, color: Colors.text },
   optionLabelActive: { color: Colors.primary, fontWeight: '600' },
   emptyText: { ...Typography.body, color: Colors.textMuted, textAlign: 'center', paddingTop: Spacing.xl },
+  // Save modal
+  saveOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.lg,
+  },
+  saveSheet: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  saveTitle: { ...Typography.title, color: Colors.text },
+  saveSubtitle: { ...Typography.labelSm, color: Colors.textMuted },
+  saveInput: {
+    ...Typography.body,
+    color: Colors.text,
+    backgroundColor: Colors.background,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderWidth: hairline,
+    borderColor: Colors.separator,
+  },
+  saveActions: { flexDirection: 'row', gap: Spacing.sm, justifyContent: 'flex-end' },
+  saveCancelBtn: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+  },
+  saveCancelText: { ...Typography.body, color: Colors.textMuted },
+  saveConfirmBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+  },
+  saveConfirmDisabled: { opacity: 0.4 },
+  saveConfirmText: { ...Typography.body, color: '#fff', fontWeight: '700' },
 });
