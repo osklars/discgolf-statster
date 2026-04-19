@@ -335,11 +335,6 @@ function EditModeContent({
   // ── Drag state ─────────────────────────────────────────────────────────────
   const [drag, setDragState] = useState<DragState | null>(null);
   const dragRef = useRef<DragState | null>(null);
-  const setDrag = useCallback((d: DragState | null) => {
-    dragRef.current = d;
-    setDragState(d);
-  }, []);
-
   // ── Layout tracking ────────────────────────────────────────────────────────
   // content Y and height of each row (onLayout y = offset within ScrollView content)
   const rowContentY = useRef<Map<string, number>>(new Map());
