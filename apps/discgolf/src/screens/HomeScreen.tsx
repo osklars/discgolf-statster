@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -7,9 +7,12 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { Colors, Radius, Spacing, Typography, hairline } from '../constants/theme';
+import { useSkill } from '../contexts/SkillContext';
+import { SkillSwitcherSheet } from '../components/SkillSwitcher/SkillSwitcherSheet';
 import { MOCK_SESSIONS, MOCK_STATS } from './mockData';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -44,14 +47,30 @@ const bar = StyleSheet.create({
 
 export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const { activeSkill } = useSkill();
+  const [switcherOpen, setSwitcherOpen] = useState(false);
   const overall = MOCK_STATS[0];
   const recentLevelUps = MOCK_STATS.filter((s) => s.recentLevelUp !== null && s.name !== 'Overall');
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.appTitle}>Disc Golf</Text>
+        <TouchableOpacity
+          style={styles.skillButton}
+          onPress={() => setSwitcherOpen(true)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.skillEmoji}>{activeSkill.emoji}</Text>
+          <Text style={[styles.appTitle, { color: activeSkill.color }]}>{activeSkill.name}</Text>
+          <Feather name="chevron-down" size={18} color={activeSkill.color} style={styles.chevron} />
+        </TouchableOpacity>
       </View>
+
+      <SkillSwitcherSheet
+        visible={switcherOpen}
+        onClose={() => setSwitcherOpen(false)}
+        onAddSkill={() => setSwitcherOpen(false)}
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -145,11 +164,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: hairline,
     borderBottomColor: Colors.separator,
   },
+  skillButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    alignSelf: 'flex-start',
+  },
+  skillEmoji: {
+    fontSize: 20,
+  },
   appTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: Colors.text,
     letterSpacing: -0.3,
+  },
+  chevron: {
+    marginTop: 2,
   },
   scroll: {
     flex: 1,
