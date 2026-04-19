@@ -33,8 +33,8 @@ export function SkillSwitcherSheet({ visible, onClose, onAddSkill }: Props) {
     }).start();
   }, [visible, slideAnim]);
 
-  const handleSelect = (skill: Skill) => {
-    switchSkill(skill.id);
+  const handleSelect = async (skill: Skill) => {
+    await switchSkill(skill.id);
     onClose();
   };
 
