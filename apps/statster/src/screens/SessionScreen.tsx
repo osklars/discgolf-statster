@@ -8,6 +8,7 @@ import { getSession } from '../db/sessions';
 import { getEntriesForSession } from '../db/entries';
 import { getDatapointsForEntry } from '../db/datapoints';
 import { getAllNamedOptions, getNamedParameters, getScalarParameters } from '../db/parameters';
+import { computeXpForEntries } from '../db/xp';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Session'>;
 
@@ -23,7 +24,7 @@ type ParamLookups = {
   optionLabels: Map<string, string>;
 };
 
-type EntryWithDatapoints = { entry: Entry; datapoints: DatapointsForEntry };
+type EntryWithDatapoints = { entry: Entry; datapoints: DatapointsForEntry; xp: number };
 
 function EntryCard({
   ewdp, index, lookups,
@@ -32,7 +33,7 @@ function EntryCard({
   index: number;
   lookups: ParamLookups;
 }) {
-  const { entry, datapoints } = ewdp;
+  const { entry, datapoints, xp } = ewdp;
   const chips: { label: string; value: string }[] = [
     ...datapoints.named.map((n) => ({
       label: lookups.namedNames.get(n.parameterId) ?? n.parameterId,
@@ -51,6 +52,7 @@ function EntryCard({
           <Text style={styles.entryIndexText}>{index + 1}</Text>
         </View>
         <Text style={styles.entryFormName}>{entry.formId}</Text>
+        <Text style={styles.entryXp}>{xp} XP</Text>
       </View>
       <View style={styles.entryFields}>
         {chips.map((c, i) => (
@@ -88,15 +90,20 @@ export function SessionScreen({ route }: Props) {
         getAllNamedOptions(),
       ]);
 
-      const ewdps = await Promise.all(
-        entries.map(async (entry) => ({
+      const [ewdps, xpResults] = await Promise.all([
+        Promise.all(entries.map(async (entry) => ({
           entry,
           datapoints: await getDatapointsForEntry(entry.id),
-        })),
-      );
+          xp: 0,
+        }))),
+        computeXpForEntries(entries.map((e) => e.id)),
+      ]);
+
+      const xpMap = new Map(xpResults.map((r) => [r.entryId, r.xp]));
+      const ewdpsWithXp = ewdps.map((e) => ({ ...e, xp: xpMap.get(e.entry.id) ?? 40 }));
 
       setSession(s);
-      setEntriesWithData(ewdps);
+      setEntriesWithData(ewdpsWithXp);
       setLookups({
         scalarNames: new Map(scalars.map((p) => [p.id, p.name])),
         namedNames: new Map(named.map((p) => [p.id, p.name])),
@@ -123,13 +130,13 @@ export function SessionScreen({ route }: Props) {
     );
   }
 
-  const execScalarId = 'exec';
-  const distScalarId = 'throw_dist';
+  const totalXp = entriesWithData.reduce((sum, e) => sum + e.xp, 0);
+  const avgXp = entriesWithData.length ? Math.round(totalXp / entriesWithData.length) : 0;
 
   const allScalars = entriesWithData.flatMap((e) => e.datapoints.scalars);
-  const execs = allScalars.filter((s) => s.parameterId === execScalarId).map((s) => s.value);
-  const dists = allScalars.filter((s) => s.parameterId === distScalarId).map((s) => s.value);
-  const avgExec = execs.length ? execs.reduce((a, b) => a + b, 0) / execs.length : null;
+  const grades = allScalars.filter((s) => s.parameterId === 'grade').map((s) => s.value);
+  const dists = allScalars.filter((s) => s.parameterId === 'distance').map((s) => s.value);
+  const avgGrade = grades.length ? grades.reduce((a, b) => a + b, 0) / grades.length : null;
   const maxDist = dists.length ? Math.max(...dists) : null;
 
   return (
@@ -149,8 +156,13 @@ export function SessionScreen({ route }: Props) {
         </View>
         <View style={styles.summarySep} />
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{avgExec !== null ? avgExec.toFixed(1) : '—'}</Text>
-          <Text style={styles.summaryLabel}>Avg exec</Text>
+          <Text style={styles.summaryValue}>{totalXp}</Text>
+          <Text style={styles.summaryLabel}>Total XP</Text>
+        </View>
+        <View style={styles.summarySep} />
+        <View style={styles.summaryItem}>
+          <Text style={styles.summaryValue}>{avgGrade !== null ? avgGrade.toFixed(1) : '—'}</Text>
+          <Text style={styles.summaryLabel}>Avg grade</Text>
         </View>
         <View style={styles.summarySep} />
         <View style={styles.summaryItem}>
@@ -184,7 +196,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg, padding: Spacing.lg, alignItems: 'center',
   },
   summaryItem: { flex: 1, alignItems: 'center', gap: 2 },
-  summaryValue: { fontSize: 22, fontWeight: '700', color: Colors.primary },
+  summaryValue: { fontSize: 20, fontWeight: '700', color: Colors.primary },
   summaryLabel: { ...Typography.labelSm, color: Colors.textMuted },
   summarySep: { width: hairline, height: 36, backgroundColor: Colors.separator },
   divider: { height: hairline, backgroundColor: Colors.separator },
@@ -199,6 +211,7 @@ const styles = StyleSheet.create({
   },
   entryIndexText: { ...Typography.labelSm, color: Colors.primary, fontWeight: '700' },
   entryFormName: { ...Typography.label, color: Colors.textMuted, flex: 1 },
+  entryXp: { ...Typography.labelSm, color: Colors.primary, fontWeight: '700' },
   entryFields: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
   fieldChip: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.background,
