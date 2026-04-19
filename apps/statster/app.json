@@ -14,7 +14,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.statster.app"
+      "bundleIdentifier": "com.statster.app",
+      "appleTeamId": "85JGP4UC6B"
     },
     "android": {
       "adaptiveIcon": {
