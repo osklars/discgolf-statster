@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { RootStackParamList } from './types';
 import { HomeScreen } from '../screens/HomeScreen';
 import { StatDetailScreen } from '../screens/StatDetailScreen';
+import { SavedLevelsScreen } from '../screens/SavedLevelsScreen';
 import { SessionScreen } from '../screens/SessionScreen';
 import { SessionFormScreen } from '../screens/SessionFormScreen';
 import { Colors } from '../constants/theme';
@@ -21,6 +22,7 @@ export function AppNavigator() {
     >
       <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
       <Stack.Screen name="StatDetail" component={StatDetailScreen} options={{ title: 'Stats' }} />
+      <Stack.Screen name="SavedLevels" component={SavedLevelsScreen} options={{ title: 'Saved Levels' }} />
       <Stack.Screen name="Session" component={SessionScreen} options={{ title: 'Session' }} />
       <Stack.Screen
         name="SessionForm"

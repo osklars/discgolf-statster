@@ -13,22 +13,35 @@ import type { RootStackParamList } from '../navigation/types';
 import { Colors, Radius, Spacing, Typography, hairline } from '../constants/theme';
 import { useSkill } from '../contexts/SkillContext';
 import { SkillSwitcherSheet } from '../components/SkillSwitcher/SkillSwitcherSheet';
-import { MOCK_STATS } from './mockData';
 import type { SessionSummary } from '../db/types';
 import { getSessionsWithEntryCounts } from '../db/sessions';
+import { getSavedLevels } from '../db/savedLevels';
+import type { SavedLevel } from '../db/savedLevels';
+import { getLevelSummary } from '../db/xp';
+import type { LevelSummary, QualityAverage } from '../db/xp';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-SE', { month: 'short', day: 'numeric' });
+type TrackedItem = SavedLevel & LevelSummary;
+
+function formatQuality(q: QualityAverage): string {
+  if (q.target === q.max || q.target === q.min) {
+    return `${q.avgValue.toFixed(1)} / ${q.target}`;
+  }
+  const sign = q.avgValue >= 0 ? '+' : '';
+  return `${sign}${q.avgValue.toFixed(1)}`;
 }
 
-function ProgressBar({ progress }: { progress: number }) {
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-SE', { month: 'short', day: 'numeric' });
+}
+
+function ProgressBar({ progress, height = 4 }: { progress: number; height?: number }) {
+  const clamped = Math.min(1, Math.max(0, progress));
   return (
-    <View style={bar.track}>
-      <View style={[bar.fill, { flex: progress }]} />
-      <View style={{ flex: 1 - progress }} />
+    <View style={[bar.track, { height }]}>
+      <View style={[bar.fill, { flex: clamped }]} />
+      <View style={{ flex: 1 - clamped }} />
     </View>
   );
 }
@@ -36,15 +49,32 @@ function ProgressBar({ progress }: { progress: number }) {
 const bar = StyleSheet.create({
   track: {
     flexDirection: 'row',
-    height: 4,
     borderRadius: 2,
     backgroundColor: Colors.separator,
     overflow: 'hidden',
   },
-  fill: {
-    backgroundColor: Colors.primary,
-    borderRadius: 2,
-  },
+  fill: { backgroundColor: Colors.primary, borderRadius: 2 },
+});
+
+function QualityRow({ averages }: { averages: QualityAverage[] }) {
+  if (averages.length === 0) return null;
+  return (
+    <View style={q.row}>
+      {averages.map((qa) => (
+        <View key={qa.paramId} style={q.item}>
+          <Text style={q.label}>{qa.name}</Text>
+          <Text style={q.value}>{formatQuality(qa)}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const q = StyleSheet.create({
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
+  item: { gap: 1 },
+  label: { ...Typography.labelSm, color: Colors.textMuted, fontSize: 10 },
+  value: { ...Typography.labelSm, color: Colors.text, fontWeight: '600' },
 });
 
 export function HomeScreen({ navigation }: Props) {
@@ -52,20 +82,35 @@ export function HomeScreen({ navigation }: Props) {
   const { activeSkill } = useSkill();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
-  const overall = MOCK_STATS[0];
-  const recentLevelUps = MOCK_STATS.filter((s) => s.recentLevelUp !== null && s.name !== 'Overall');
+  const [overall, setOverall] = useState<LevelSummary | null>(null);
+  const [tracked, setTracked] = useState<TrackedItem[]>([]);
 
-  const loadSessions = useCallback(() => {
-    getSessionsWithEntryCounts().then(setSessions).catch(console.error);
+  const loadData = useCallback(async () => {
+    const [overallSummary, savedLevels, sessionList] = await Promise.all([
+      getLevelSummary([]),
+      getSavedLevels(),
+      getSessionsWithEntryCounts(),
+    ]);
+
+    const top4 = savedLevels.slice(0, 4);
+    const summaries = await Promise.all(
+      top4.map((sl) =>
+        getLevelSummary(sl.filters.map((f) => ({ parameterId: f.parameterId, optionId: f.optionId }))),
+      ),
+    );
+
+    setOverall(overallSummary);
+    setTracked(top4.map((sl, i) => ({ ...sl, ...summaries[i] })));
+    setSessions(sessionList);
   }, []);
 
   useEffect(() => {
-    loadSessions();
-  }, [loadSessions]);
+    loadData().catch(console.error);
+  }, [loadData]);
 
   useEffect(() => {
-    return navigation.addListener('focus', loadSessions);
-  }, [navigation, loadSessions]);
+    return navigation.addListener('focus', () => loadData().catch(console.error));
+  }, [navigation, loadData]);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -92,46 +137,64 @@ export function HomeScreen({ navigation }: Props) {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Stats summary card */}
+        {/* Overall level — always shown */}
         <TouchableOpacity
           activeOpacity={0.75}
-          onPress={() => navigation.navigate('StatDetail')}
-          style={styles.statsCard}
+          style={styles.overallCard}
+          onPress={() => navigation.navigate('StatDetail', { filters: [] })}
         >
           <Text style={styles.sectionLabel}>OVERALL LEVEL</Text>
-          <View style={styles.levelRow}>
-            <Text style={styles.levelNumber}>{overall.level}</Text>
-            <View style={styles.levelMeta}>
-              <ProgressBar progress={overall.progress} />
-              <Text style={styles.levelSubtext}>
-                {Math.round(overall.progress * 100)}% to level {overall.level + 1}
-              </Text>
-            </View>
-          </View>
-
-          {recentLevelUps.length > 0 && (
-            <View style={styles.levelUpRow}>
-              <Text style={styles.levelUpLabel}>Recent level-ups  </Text>
-              {recentLevelUps.map((s) => (
-                <View key={s.name} style={styles.levelUpChip}>
-                  <Text style={styles.levelUpChipText}>
-                    ↑ {s.name} {s.level}
+          {overall && (
+            <>
+              <View style={styles.overallLevelRow}>
+                <Text style={styles.overallLevelNumber}>{overall.level}</Text>
+                <View style={styles.overallMeta}>
+                  <ProgressBar progress={overall.progress} />
+                  <Text style={styles.levelSubtext}>
+                    {Math.round(overall.progress * 100)}% to level {overall.level + 1}
                   </Text>
                 </View>
+              </View>
+              <QualityRow averages={overall.qualityAverages} />
+            </>
+          )}
+        </TouchableOpacity>
+
+        {/* Tracked levels */}
+        <View style={styles.trackedCard}>
+          <View style={styles.trackedHeader}>
+            <Text style={styles.sectionLabel}>TRACKED</Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('SavedLevels')}
+              style={styles.manageBtn}
+            >
+              <Text style={styles.manageBtnText}>Manage</Text>
+              <Feather name="chevron-right" size={14} color={Colors.primary} />
+            </TouchableOpacity>
+          </View>
+
+          {tracked.length === 0 ? (
+            <Text style={styles.emptyTracked}>
+              No tracked levels yet. Open Stats, set a filter, and tap the bookmark icon to save one.
+            </Text>
+          ) : (
+            <View style={styles.trackedGrid}>
+              {tracked.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  activeOpacity={0.75}
+                  style={styles.trackedItem}
+                  onPress={() => navigation.navigate('StatDetail', { filters: item.filters })}
+                >
+                  <Text style={styles.trackedName}>{item.name}</Text>
+                  <Text style={styles.trackedLevel}>{item.level}</Text>
+                  <ProgressBar progress={item.progress} />
+                  <QualityRow averages={item.qualityAverages} />
+                </TouchableOpacity>
               ))}
             </View>
           )}
-
-          <View style={styles.statsGrid}>
-            {MOCK_STATS.slice(1).map((stat) => (
-              <View key={stat.name} style={styles.statItem}>
-                <Text style={styles.statName}>{stat.name}</Text>
-                <Text style={styles.statLevel}>{stat.level}</Text>
-                <ProgressBar progress={stat.progress} />
-              </View>
-            ))}
-          </View>
-        </TouchableOpacity>
+        </View>
 
         {/* Recent sessions */}
         <Text style={styles.sectionTitle}>Recent sessions</Text>
@@ -173,10 +236,7 @@ export function HomeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
+  root: { flex: 1, backgroundColor: Colors.background },
   header: {
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
@@ -189,26 +249,17 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     alignSelf: 'flex-start',
   },
-  skillEmoji: {
-    fontSize: 20,
-  },
-  appTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  chevron: {
-    marginTop: 2,
-  },
-  scroll: {
-    flex: 1,
-  },
+  skillEmoji: { fontSize: 20 },
+  appTitle: { fontSize: 22, fontWeight: '700', letterSpacing: -0.3 },
+  chevron: { marginTop: 2 },
+  scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.lg,
     gap: Spacing.md,
   },
-  statsCard: {
+  // Overall card
+  overallCard: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.lg,
@@ -221,66 +272,52 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
-  levelRow: {
+  overallLevelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.lg,
   },
-  levelNumber: {
+  overallLevelNumber: {
     fontSize: 52,
     fontWeight: '700',
     color: Colors.primary,
     lineHeight: 56,
   },
-  levelMeta: {
-    flex: 1,
-    gap: Spacing.xs,
+  overallMeta: { flex: 1, gap: Spacing.xs },
+  levelSubtext: { ...Typography.labelSm, color: Colors.textMuted },
+  // Tracked card
+  trackedCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    gap: Spacing.md,
   },
-  levelSubtext: {
-    ...Typography.labelSm,
-    color: Colors.textMuted,
-  },
-  levelUpRow: {
+  trackedHeader: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: Spacing.xs,
+    justifyContent: 'space-between',
   },
-  levelUpLabel: {
-    ...Typography.labelSm,
-    color: Colors.textMuted,
-  },
-  levelUpChip: {
-    backgroundColor: Colors.primaryLight,
-    borderRadius: Radius.pill,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-  },
-  levelUpChipText: {
-    ...Typography.labelSm,
-    color: Colors.primary,
-    fontWeight: '600',
-  },
-  statsGrid: {
+  manageBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  manageBtnText: { ...Typography.labelSm, color: Colors.primary, fontWeight: '600' },
+  trackedGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.md,
-    paddingTop: Spacing.xs,
-    borderTopWidth: hairline,
-    borderTopColor: Colors.separator,
   },
-  statItem: {
+  trackedItem: {
     width: '45%',
     gap: 4,
   },
-  statName: {
+  trackedName: { ...Typography.labelSm, color: Colors.textMuted },
+  trackedLevel: { ...Typography.title, color: Colors.text },
+  emptyTracked: {
     ...Typography.labelSm,
     color: Colors.textMuted,
+    textAlign: 'center',
+    paddingVertical: Spacing.md,
+    lineHeight: 18,
   },
-  statLevel: {
-    ...Typography.title,
-    color: Colors.text,
-  },
+  // Sessions
   sectionTitle: {
     ...Typography.title,
     color: Colors.text,
@@ -293,23 +330,10 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     padding: Spacing.lg,
   },
-  sessionCardLeft: {
-    flex: 1,
-    gap: 2,
-  },
-  sessionCourse: {
-    ...Typography.body,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  sessionMeta: {
-    ...Typography.labelSm,
-    color: Colors.textMuted,
-  },
-  sessionDate: {
-    ...Typography.label,
-    color: Colors.textMuted,
-  },
+  sessionCardLeft: { flex: 1, gap: 2 },
+  sessionCourse: { ...Typography.body, fontWeight: '600', color: Colors.text },
+  sessionMeta: { ...Typography.labelSm, color: Colors.textMuted },
+  sessionDate: { ...Typography.label, color: Colors.textMuted },
   emptyLabel: {
     ...Typography.label,
     color: Colors.textMuted,
@@ -329,9 +353,5 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     alignItems: 'center',
   },
-  newSessionText: {
-    ...Typography.body,
-    color: '#fff',
-    fontWeight: '700',
-  },
+  newSessionText: { ...Typography.body, color: '#fff', fontWeight: '700' },
 });

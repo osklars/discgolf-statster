@@ -15,7 +15,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { Colors, MIN_HIT, Radius, Spacing, Typography, hairline } from '../constants/theme';
 import { getNamedParameters, getAllNamedOptions } from '../db/parameters';
-import { getXpWithFilters, xpToLevel, levelThreshold } from '../db/xp';
+import { getLevelSummary, xpToLevel, levelThreshold } from '../db/xp';
+import type { QualityAverage } from '../db/xp';
 import { insertSavedLevel } from '../db/savedLevels';
 import type { SavedLevelFilter } from '../db/savedLevels';
 
@@ -53,6 +54,7 @@ export function StatDetailScreen({ route, navigation }: Props) {
   const [filters, setFilters] = useState<FilterChip[]>(initialFilters);
   const [totalXp, setTotalXp] = useState(0);
   const [entryCount, setEntryCount] = useState(0);
+  const [qualityAverages, setQualityAverages] = useState<QualityAverage[]>([]);
   const [paramGroups, setParamGroups] = useState<NamedParamGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -99,19 +101,20 @@ export function StatDetailScreen({ route, navigation }: Props) {
     loadParams().catch(console.error);
   }, []);
 
-  const reloadXp = useCallback(async (activeFilters: FilterChip[]) => {
+  const reload = useCallback(async (activeFilters: FilterChip[]) => {
     setLoading(true);
-    const result = await getXpWithFilters(
+    const result = await getLevelSummary(
       activeFilters.map((f) => ({ parameterId: f.parameterId, optionId: f.optionId })),
     );
     setTotalXp(result.totalXp);
     setEntryCount(result.entryCount);
+    setQualityAverages(result.qualityAverages);
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    reloadXp(filters);
-  }, [filters, reloadXp]);
+    reload(filters);
+  }, [filters, reload]);
 
   const addFilter = (chip: FilterChip) => {
     setFilters((prev) => {
@@ -172,6 +175,7 @@ export function StatDetailScreen({ route, navigation }: Props) {
       >
         {/* Level card */}
         <View style={styles.levelCard}>
+
           {loading ? (
             <ActivityIndicator color={Colors.primary} />
           ) : (
@@ -219,6 +223,38 @@ export function StatDetailScreen({ route, navigation }: Props) {
             </>
           )}
         </View>
+
+        {/* Quality averages card */}
+        {!loading && qualityAverages.length > 0 && (
+          <View style={styles.qualityCard}>
+            <Text style={styles.qualityTitle}>QUALITY AVERAGES</Text>
+            {qualityAverages.map((qa) => {
+              const isMaxTarget = qa.target === qa.max || qa.target === qa.min;
+              const displayValue = isMaxTarget
+                ? `${qa.avgValue.toFixed(1)} / ${qa.target}`
+                : `${qa.avgValue >= 0 ? '+' : ''}${qa.avgValue.toFixed(1)}`;
+              const delta = qa.avgValue - qa.target;
+              const maxDist = Math.max(qa.target - qa.min, qa.max - qa.target);
+              const weight = maxDist === 0 ? 2 : 2 - 1.5 * (Math.abs(delta) / maxDist);
+              const quality = (weight - 0.5) / 1.5;
+              const qualityColor =
+                quality >= 0.75 ? Colors.primary : quality >= 0.45 ? '#F59E0B' : '#EF4444';
+              const barFill = Math.min(1, Math.max(0, (qa.avgValue - qa.min) / (qa.max - qa.min)));
+              return (
+                <View key={qa.paramId} style={styles.qualityRow}>
+                  <Text style={styles.qualityName}>{qa.name}</Text>
+                  <View style={styles.qualityBarWrap}>
+                    <View style={styles.qualityBarTrack}>
+                      <View style={[styles.qualityBarFill, { flex: barFill, backgroundColor: qualityColor }]} />
+                      <View style={{ flex: 1 - barFill }} />
+                    </View>
+                  </View>
+                  <Text style={[styles.qualityValue, { color: qualityColor }]}>{displayValue}</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
 
       {/* Filter picker modal */}
@@ -471,4 +507,34 @@ const styles = StyleSheet.create({
   },
   saveConfirmDisabled: { opacity: 0.4 },
   saveConfirmText: { ...Typography.body, color: '#fff', fontWeight: '700' },
+  // Quality averages card
+  qualityCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  qualityTitle: {
+    ...Typography.labelSm,
+    color: Colors.textMuted,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  qualityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  qualityName: { ...Typography.label, color: Colors.text, width: 110 },
+  qualityBarWrap: { flex: 1 },
+  qualityBarTrack: {
+    flexDirection: 'row',
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.separator,
+    overflow: 'hidden',
+  },
+  qualityBarFill: { borderRadius: 3 },
+  qualityValue: { ...Typography.label, fontWeight: '600', width: 64, textAlign: 'right' },
 });
