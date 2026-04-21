@@ -12,11 +12,18 @@ The app lives in `apps/statster/`.
 
 Run from `apps/statster/`:
 
+Expo dev client
 ```bash
-npm start          # Start Expo dev server
-npm run ios        # Run on iOS device
-npm run android    # Run on Android device/emulator
-npm run web        # Run web version
+npx expo run:ios   # Start Expo dev server (add --device to launch automatically on phone without scanning qr) 
+npx expo prebuild --clean # run when switching bundles
+```
+
+Standalone ios app
+```bash
+rm -rf ~/Library/Developer/Xcode/DerivedData/Statster-* 
+npx expo run:ios --configuration Release
+open ios/Statster.xcworkspace/ 
+# xcode > Product > Scheme > Edit Scheme > Run > Release
 ```
 
 No lint or test scripts are configured. TypeScript strict mode serves as the primary type-safety mechanism.
