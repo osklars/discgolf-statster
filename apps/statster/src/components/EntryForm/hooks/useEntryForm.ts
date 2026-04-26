@@ -7,7 +7,7 @@ function isGrid2D(p: Param): p is Grid2DParam {
   return p.type === 'grid2d';
 }
 
-export function useEntryForm(params: Param[]): EntryFormState & {
+export function useEntryForm(params: Param[], initialValues?: Record<string, ParamValue>): EntryFormState & {
   toggleExpanded: (id: string) => void;
   setValue: (id: string, value: ParamValue) => void;
   clearValue: (id: string) => void;
@@ -18,7 +18,7 @@ export function useEntryForm(params: Param[]): EntryFormState & {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
     () => new Set(params.map((p) => p.id)),
   );
-  const [values, setValues] = useState<Record<string, ParamValue>>({});
+  const [values, setValues] = useState<Record<string, ParamValue>>(initialValues ?? {});
 
   const toggleExpanded = useCallback((id: string) => {
     setExpandedIds((prev) => {

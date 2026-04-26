@@ -54,6 +54,19 @@ export function EntryForm({ onBack, entryCount = 0, onLogThrow }: EntryFormProps
   const [dbReady, setDbReady] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editKey, setEditKey] = useState(0);
+  const [stickyValues, setStickyValues] = useState<Record<string, ParamValue>>({});
+
+  const handleStickyChange = useCallback((paramId: string, value: ParamValue | undefined) => {
+    setStickyValues((prev) => {
+      const next = { ...prev };
+      if (value === undefined) {
+        delete next[paramId];
+      } else {
+        next[paramId] = value;
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     loadFormDefinitions()
@@ -183,6 +196,8 @@ export function EntryForm({ onBack, entryCount = 0, onLogThrow }: EntryFormProps
           formDef={activeDef}
           entryCount={entryCount}
           onLogThrow={onLogThrow}
+          stickyValues={stickyValues}
+          onStickyChange={handleStickyChange}
         />
       )}
     </View>
@@ -196,10 +211,17 @@ interface ViewModeProps {
   formDef: FormDefinition;
   entryCount: number;
   onLogThrow?: EntryFormProps['onLogThrow'];
+  stickyValues: Record<string, ParamValue>;
+  onStickyChange: (paramId: string, value: ParamValue | undefined) => void;
 }
 
-function ViewModeContent({ formDef, entryCount, onLogThrow }: ViewModeProps) {
-  const form = useEntryForm(formDef.params);
+function ViewModeContent({ formDef, entryCount, onLogThrow, stickyValues, onStickyChange }: ViewModeProps) {
+  const initialValues = Object.fromEntries(
+    formDef.params
+      .filter((p) => p.clearAfterSubmit === false && stickyValues[p.id] !== undefined)
+      .map((p) => [p.id, stickyValues[p.id]]),
+  );
+  const form = useEntryForm(formDef.params, initialValues);
   const scrollRef = useRef<ScrollView>(null);
 
   const handleDragStart = useCallback(() => {
@@ -210,8 +232,19 @@ function ViewModeContent({ formDef, entryCount, onLogThrow }: ViewModeProps) {
     (paramId: string, value: string) => {
       scrollRef.current?.setNativeProps({ scrollEnabled: true });
       form.setValue(paramId, value);
+      const param = formDef.params.find((p) => p.id === paramId);
+      if (param?.clearAfterSubmit === false) onStickyChange(paramId, value);
     },
-    [form],
+    [form, formDef.params, onStickyChange],
+  );
+
+  const wrapClear = useCallback(
+    (paramId: string) => {
+      form.clearValue(paramId);
+      const param = formDef.params.find((p) => p.id === paramId);
+      if (param?.clearAfterSubmit === false) onStickyChange(paramId, undefined);
+    },
+    [form, formDef.params, onStickyChange],
   );
 
   const handleLogThrow = useCallback(async () => {
@@ -237,7 +270,7 @@ function ViewModeContent({ formDef, entryCount, onLogThrow }: ViewModeProps) {
             isExpanded={form.expandedIds.has(param.id)}
             onToggle={() => form.toggleExpanded(param.id)}
             onCommit={(v) => wrapCommit(param.id, v)}
-            onClear={() => form.clearValue(param.id)}
+            onClear={() => wrapClear(param.id)}
             formatValue={form.formatValue}
             onDragStart={handleDragStart}
           />
