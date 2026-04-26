@@ -7,10 +7,11 @@ interface Props {
   name: string;
   isEditMode: boolean;
   onEditPress: () => void;
+  onRenamePress?: () => void;
   onBack?: () => void;
 }
 
-export function FormHeader({ name, isEditMode, onEditPress, onBack }: Props) {
+export function FormHeader({ name, isEditMode, onEditPress, onRenamePress, onBack }: Props) {
   return (
     <View style={styles.container}>
       {onBack && (
@@ -18,10 +19,16 @@ export function FormHeader({ name, isEditMode, onEditPress, onBack }: Props) {
           <Feather name="chevron-left" size={24} color={Colors.primary} />
         </TouchableOpacity>
       )}
-      <Text style={styles.name}>{name}</Text>
+      {!isEditMode && onRenamePress ? (
+        <TouchableOpacity onPress={onRenamePress} activeOpacity={0.6} style={styles.nameBtn}>
+          <Text style={styles.name}>{name}</Text>
+        </TouchableOpacity>
+      ) : (
+        <Text style={[styles.name, styles.nameStatic]}>{name}</Text>
+      )}
       {!isEditMode && (
         <TouchableOpacity onPress={onEditPress} activeOpacity={0.6} style={styles.editBtn}>
-          <Feather name="edit-2" size={18} color={Colors.primary} />
+          <Feather name="sliders" size={18} color={Colors.primary} />
         </TouchableOpacity>
       )}
     </View>
@@ -43,9 +50,15 @@ const styles = StyleSheet.create({
     paddingRight: Spacing.xs,
     marginLeft: -Spacing.xs,
   },
+  nameBtn: {
+    flex: 1,
+    paddingVertical: Spacing.xs,
+  },
+  nameStatic: {
+    flex: 1,
+  },
   name: {
     ...Typography.title,
-    flex: 1,
     color: Colors.text,
   },
   editBtn: {

@@ -10,24 +10,29 @@ function now(): string {
   return new Date().toISOString();
 }
 
-type SessionRow = { id: string; started_at: string; finished_at: string | null; notes: string | null };
+type SessionRow = { id: string; started_at: string; finished_at: string | null; notes: string | null; name: string | null };
 
 function toSession(r: SessionRow): Session {
-  return { id: r.id, startedAt: r.started_at, finishedAt: r.finished_at, notes: r.notes };
+  return { id: r.id, startedAt: r.started_at, finishedAt: r.finished_at, notes: r.notes, name: r.name };
 }
 
-export async function startSession(notes?: string): Promise<Session> {
+export async function startSession(name?: string, notes?: string): Promise<Session> {
   const session: Session = {
     id: uid(),
     startedAt: now(),
     finishedAt: null,
     notes: notes ?? null,
+    name: name ?? null,
   };
   await getSkillDb().runAsync(
-    'INSERT INTO session (id, started_at, finished_at, notes) VALUES (?, ?, NULL, ?)',
-    [session.id, session.startedAt, session.notes],
+    'INSERT INTO session (id, started_at, finished_at, notes, name) VALUES (?, ?, NULL, ?, ?)',
+    [session.id, session.startedAt, session.notes, session.name],
   );
   return session;
+}
+
+export async function renameSession(sessionId: string, name: string): Promise<void> {
+  await getSkillDb().runAsync('UPDATE session SET name = ? WHERE id = ?', [name.trim() || null, sessionId]);
 }
 
 export async function finishSession(sessionId: string, notes?: string): Promise<Session> {
@@ -56,12 +61,12 @@ export async function getSession(id: string): Promise<Session | null> {
 }
 
 export async function getSessionsWithEntryCounts(): Promise<SessionSummary[]> {
-  const rows = await getSkillDb().getAllAsync<{ id: string; started_at: string; entry_count: number }>(
-    `SELECT s.id, s.started_at, COUNT(e.id) AS entry_count
+  const rows = await getSkillDb().getAllAsync<{ id: string; started_at: string; entry_count: number; name: string | null }>(
+    `SELECT s.id, s.started_at, s.name, COUNT(e.id) AS entry_count
      FROM session s
      LEFT JOIN entry e ON e.session_id = s.id
      GROUP BY s.id
      ORDER BY s.started_at DESC`,
   );
-  return rows.map(r => ({ id: r.id, startedAt: r.started_at, entryCount: r.entry_count }));
+  return rows.map(r => ({ id: r.id, startedAt: r.started_at, entryCount: r.entry_count, name: r.name }));
 }

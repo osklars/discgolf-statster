@@ -211,7 +211,7 @@ export function HomeScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('Session', { sessionId: session.id })}
           >
             <View style={styles.sessionCardLeft}>
-              <Text style={styles.sessionCourse}>Session</Text>
+              <Text style={styles.sessionCourse}>{session.name ?? 'Session'}</Text>
               <Text style={styles.sessionMeta}>
                 {session.entryCount} {session.entryCount === 1 ? 'throw' : 'throws'}
               </Text>

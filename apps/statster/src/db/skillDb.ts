@@ -15,6 +15,7 @@ export async function openSkillDb(dbFile: string): Promise<SQLite.SQLiteDatabase
   _db = await SQLite.openDatabaseAsync(dbFile);
   _dbFile = dbFile;
   await _db.execAsync(SKILL_DB_SCHEMA);
+  try { await _db.execAsync('ALTER TABLE session ADD COLUMN name TEXT'); } catch {}
 
   return _db;
 }

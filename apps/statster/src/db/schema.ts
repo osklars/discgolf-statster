@@ -73,7 +73,8 @@ export const SKILL_DB_SCHEMA = `
     id          TEXT PRIMARY KEY,
     started_at  TEXT NOT NULL,
     finished_at TEXT,
-    notes       TEXT
+    notes       TEXT,
+    name        TEXT
   );
 
   CREATE TABLE IF NOT EXISTS entry (

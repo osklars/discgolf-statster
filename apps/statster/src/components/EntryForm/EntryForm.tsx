@@ -22,6 +22,7 @@ import { AddParamSheet } from './components/AddParamSheet';
 import { useEntryForm } from './hooks/useEntryForm';
 import { useEditForm } from './hooks/useEditForm';
 import { loadFormDefinitions, saveFormDefinitionToDb, saveParamToDb } from '../../db/mappers';
+import { upsertForm } from '../../db/forms';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -72,6 +73,40 @@ export function EntryForm({ onBack, entryCount = 0, onLogThrow }: EntryFormProps
     setIsEditMode(true);
   };
 
+  const handleRenameForm = useCallback(() => {
+    if (!activeDef) return;
+    Alert.prompt(
+      'Rename form',
+      'Enter a new name',
+      async (name) => {
+        if (!name?.trim()) return;
+        await upsertForm({ id: activeDef.id, name: name.trim(), sortOrder: 0 });
+        setFormDefs((prev) => prev.map((f) => (f.id === activeDef.id ? { ...f, name: name.trim() } : f)));
+      },
+      'plain-text',
+      activeDef.name,
+    );
+  }, [activeDef]);
+
+  const handleAddForm = useCallback(() => {
+    Alert.prompt(
+      'New form',
+      'Enter a name for the new form',
+      async (name) => {
+        if (!name?.trim()) return;
+        const newDef: FormDefinition = {
+          id: randomUUID(),
+          name: name.trim(),
+          params: [],
+        };
+        await saveFormDefinitionToDb(newDef);
+        setFormDefs((prev) => [...prev, newDef]);
+        setActiveId(newDef.id);
+      },
+      'plain-text',
+    );
+  }, [formDefs.length]);
+
   const handleOverwrite = useCallback(
     async (draft: Param[]) => {
       const updated = { ...activeDef, params: draft };
@@ -116,10 +151,16 @@ export function EntryForm({ onBack, entryCount = 0, onLogThrow }: EntryFormProps
 
   return (
     <View style={styles.root}>
-      <FormHeader name={activeDef.name} isEditMode={isEditMode} onEditPress={enterEdit} onBack={onBack} />
+      <FormHeader
+        name={activeDef.name}
+        isEditMode={isEditMode}
+        onEditPress={enterEdit}
+        onRenamePress={handleRenameForm}
+        onBack={onBack}
+      />
 
       {!isEditMode && (
-        <FormTabs defs={formDefs} activeId={activeId!} onSelect={setActiveId} />
+        <FormTabs defs={formDefs} activeId={activeId!} onSelect={setActiveId} onAdd={handleAddForm} />
       )}
 
       {isEditMode ? (
@@ -450,10 +491,10 @@ interface FormTabsProps {
   defs: FormDefinition[];
   activeId: string;
   onSelect: (id: string | null) => void;
+  onAdd: () => void;
 }
 
-function FormTabs({ defs, activeId, onSelect }: FormTabsProps) {
-  if (defs.length < 2) return null;
+function FormTabs({ defs, activeId, onSelect, onAdd }: FormTabsProps) {
   return (
     <ScrollView
       horizontal
@@ -477,6 +518,9 @@ function FormTabs({ defs, activeId, onSelect }: FormTabsProps) {
           </TouchableOpacity>
         );
       })}
+      <TouchableOpacity onPress={onAdd} activeOpacity={0.7} style={styles.addFormTab}>
+        <Text style={styles.addFormTabText}>+</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -539,6 +583,21 @@ const styles = StyleSheet.create({
   },
   formTabTextActive: {
     color: '#fff',
+  },
+  addFormTab: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addFormTabText: {
+    ...Typography.label,
+    color: Colors.primary,
+    fontWeight: '700',
+    fontSize: 18,
+    lineHeight: 20,
   },
   ghost: {
     position: 'absolute',

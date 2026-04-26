@@ -56,12 +56,14 @@ export type Session = {
   startedAt: string;
   finishedAt: string | null;
   notes: string | null;
+  name: string | null;
 };
 
 export type SessionSummary = {
   id: string;
   startedAt: string;
   entryCount: number;
+  name: string | null;
 };
 
 export type Entry = {

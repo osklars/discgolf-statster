@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { Colors, MIN_HIT, Radius, Spacing, Typography, hairline } from '../constants/theme';
 import type { DatapointsForEntry, Entry, Session } from '../db/types';
-import { getSession } from '../db/sessions';
+import { getSession, renameSession } from '../db/sessions';
 import { getEntriesForSession } from '../db/entries';
 import { getDatapointsForEntry } from '../db/datapoints';
 import { getAllNamedOptions, getNamedParameters, getScalarParameters } from '../db/parameters';
@@ -114,6 +115,36 @@ export function SessionScreen({ route, navigation }: Props) {
     load().catch(console.error);
   }, [sessionId]);
 
+  const handleRename = () => {
+    if (!session) return;
+    Alert.prompt(
+      'Rename session',
+      'Enter a name for this session',
+      async (name) => {
+        if (name === undefined) return;
+        await renameSession(sessionId, name);
+        setSession((s) => s ? { ...s, name: name.trim() || null } : s);
+        navigation.setOptions({ title: name.trim() || 'Session' });
+      },
+      'plain-text',
+      session.name ?? '',
+    );
+  };
+
+  useEffect(() => {
+    if (session) {
+      navigation.setOptions({
+        title: session.name ?? 'Session',
+        headerRight: () => (
+          <TouchableOpacity onPress={handleRename} activeOpacity={0.6} style={styles.renameBtn}>
+            <Feather name="edit-2" size={16} color={Colors.primary} />
+          </TouchableOpacity>
+        ),
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.name]);
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -219,6 +250,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
   },
+  renameBtn: { paddingLeft: Spacing.md },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
   emptyText: { ...Typography.body, color: Colors.textMuted, textAlign: 'center' },
   sessionMeta: { gap: 2 },
