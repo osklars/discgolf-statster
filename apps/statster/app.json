@@ -21,9 +21,13 @@
           {
             "UTTypeIdentifier": "com.statster.session",
             "UTTypeDescription": "Statster Session",
-            "UTTypeConformsTo": ["public.json"],
+            "UTTypeConformsTo": [
+              "public.json"
+            ],
             "UTTypeTagSpecification": {
-              "public.filename-extension": ["statster"]
+              "public.filename-extension": [
+                "statster"
+              ]
             }
           }
         ],
@@ -31,7 +35,9 @@
           {
             "CFBundleTypeName": "Statster Session",
             "CFBundleTypeRole": "Editor",
-            "LSItemContentTypes": ["com.statster.session"]
+            "LSItemContentTypes": [
+              "com.statster.session"
+            ]
           }
         ]
       }
@@ -42,7 +48,8 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.statster.app.dev"
     },
     "web": {
       "favicon": "./assets/favicon.png"
