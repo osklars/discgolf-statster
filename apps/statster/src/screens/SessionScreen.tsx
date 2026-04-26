@@ -10,6 +10,7 @@ import { getEntriesForSession } from '../db/entries';
 import { getDatapointsForEntry } from '../db/datapoints';
 import { getAllNamedOptions, getNamedParameters, getScalarParameters } from '../db/parameters';
 import { computeXpForEntries } from '../db/xp';
+import { shareSession } from '../utils/shareSession';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Session'>;
 
@@ -131,14 +132,24 @@ export function SessionScreen({ route, navigation }: Props) {
     );
   };
 
+  const handleShare = () => {
+    if (!session) return;
+    shareSession(session.id, session.name).catch(console.error);
+  };
+
   useEffect(() => {
     if (session) {
       navigation.setOptions({
         title: session.name ?? 'Session',
         headerRight: () => (
-          <TouchableOpacity onPress={handleRename} activeOpacity={0.6} style={styles.renameBtn}>
-            <Feather name="edit-2" size={16} color={Colors.primary} />
-          </TouchableOpacity>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity onPress={handleShare} activeOpacity={0.6}>
+              <Feather name="share" size={16} color={Colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleRename} activeOpacity={0.6}>
+              <Feather name="edit-2" size={16} color={Colors.primary} />
+            </TouchableOpacity>
+          </View>
         ),
       });
     }
@@ -250,7 +261,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
   },
-  renameBtn: { paddingLeft: Spacing.md },
+  headerButtons: { flexDirection: 'row', gap: Spacing.md, paddingLeft: Spacing.md },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
   emptyText: { ...Typography.body, color: Colors.textMuted, textAlign: 'center' },
   sessionMeta: { gap: 2 },

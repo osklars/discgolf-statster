@@ -15,7 +15,26 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.statster.app.dev",
-      "appleTeamId": "85JGP4UC6B"
+      "appleTeamId": "85JGP4UC6B",
+      "infoPlist": {
+        "UTExportedTypeDeclarations": [
+          {
+            "UTTypeIdentifier": "com.statster.session",
+            "UTTypeDescription": "Statster Session",
+            "UTTypeConformsTo": ["public.json"],
+            "UTTypeTagSpecification": {
+              "public.filename-extension": ["statster"]
+            }
+          }
+        ],
+        "CFBundleDocumentTypes": [
+          {
+            "CFBundleTypeName": "Statster Session",
+            "CFBundleTypeRole": "Editor",
+            "LSItemContentTypes": ["com.statster.session"]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
