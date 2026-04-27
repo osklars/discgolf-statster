@@ -21,5 +21,5 @@ The README should contain:
 ### Notes
 
 - This is a read-heavy task — explore freely
-- Accuracy matters more than speed; if something is unclear, check the source
+- Accuracy matters more than speed; if something is unclear, check the source and verify difficult things with Oskar
 - Once done, this README becomes a living document: update it after every code change
