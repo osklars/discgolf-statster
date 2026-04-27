@@ -1,11 +1,35 @@
 # CLAUDE.md
 
-Hello and welcome to my app `Statster`. 
+## Collaboration
 
-When working on this app together I want us to discuss the planned changes before we make any edits. This way I can help spot potential bugs or misunderstandings. 
+We discuss ideas and plan before implementing. `CLAUDE_WIP.md` at the repo root is our shared task tracker — read it at the start of each prompt in case Oskar has made edits directly.
+
+**During planning** — avoid file exploration. Refer to `apps/statster/README.md` or ask Oskar as a first resort. This saves time and credits.
+
+**During implementation** — explore freely. Use whatever tools and operations are needed; Oskar may step away and leave you to it.
+
+**After any code changes** — re-read `apps/statster/README.md` and update it to reflect what changed. Oskar commits between every prompt, so the README diff serves as his summary of what structurally changed.
 
 ## Project
 
-**Statster** is a React Native / Expo mobile app for tracking personal progress and statistics. For example the skill we're focused on during development is disc golf, where the user can track anything from how good it is at forehand anhyzer throws, to putting and different courses. You can choose to enter as much or as little data you want while playing and then 
+See `apps/statster/README.md` for the full architecture, domain concepts, and per-file responsibility index.
 
-The power of the app lies in the very generic and powerful schema and interface that allows the user to track whatever parameter it cares about for each individual skill. Each "skill" is an isolated workspace with its own SQLite database, parameters, forms, and entry tracking even though they all share the same schema.
+## Commands
+
+Run from `apps/statster/`:
+
+Expo dev client
+```bash
+npx expo run:ios   # Start Expo dev server (add --device to launch automatically on phone without scanning qr) 
+npx expo prebuild --clean # run when switching bundles
+```
+
+Standalone ios app
+```bash
+rm -rf ~/Library/Developer/Xcode/DerivedData/Statster-* 
+npx expo run:ios --configuration Release
+open ios/Statster.xcworkspace/ 
+# xcode > Product > Scheme > Edit Scheme > Run > Release
+```
+
+No lint or test scripts are configured. TypeScript strict mode serves as the primary type-safety mechanism.
