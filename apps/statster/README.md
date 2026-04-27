@@ -1,6 +1,18 @@
 # Statster
 
-A personal skill-tracking app. Track stats for any practice-based skill — disc golf, guitar, gym, etc. Each skill is an isolated workspace with its own parameters, options, and entries.
+## Vision & Purpose
+
+Statster is a stat diary for people who want to track their own progress with precision. The core idea: whenever you practice something — disc golf, guitar, gym — you log entries with whatever parameters matter to you that day. Sometimes detailed, sometimes minimal. The app never forces a specific shape on your data.
+
+The two deliberately separate concerns:
+
+**Data collection** — the priority. An entry is just a set of parameter values. The schema is intentionally slim and generic. The EntryForm is the heart of the app; most engineering effort goes here because frictionless input is the whole point.
+
+**Analysis** — built on top, kept separate. XP, levels, and correlations are derived from the raw data. The exact shape of this layer is intentionally deferred until there's enough real data to know what's actually useful. What exists now (xp.ts, quality parameter type) is placeholder scaffolding.
+
+Entries contribute to levels based on which parameters they contain — a forehand-only entry counts toward your forehand level, a detailed entry with angle/release/distance counts toward all of those. Correlation views (e.g. your anhyzer level vs your pull tendency) are the long-term analytical payoff.
+
+The skill/workspace concept makes the whole thing generic — disc golf, guitar, anything you'd want to gamify.
 
 ---
 
