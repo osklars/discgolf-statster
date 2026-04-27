@@ -1,30 +1,25 @@
 # Current Work in Progress
 
-## Improve collaboration between Oskar and Claude
+## Deep-document the app in apps/statster/README.md
 
-Establishing clear ground rules and shared tooling for efficient cooperation.
+The goal is to make the README detailed enough that Claude can locate where to make any change just by reading it — without searching through files. This eliminates the most expensive part of our collaboration.
+
+The README should contain:
+
+- **Domain concept hierarchy** — skill → session → form → parameter, explained in plain English so a change request maps naturally to a concept
+- **Navigation and component tree** — so UI-level changes have a clear entry point
+- **Per-file responsibility index** — what each file owns, what state it manages, what it does NOT do
 
 ### Tasks
 
-- [ ] Update `apps/statster/README.md` — expand into a living codebase map:
-  - Domain concept hierarchy (skill → session → form → parameter)
-  - Navigation and component tree
-  - Per-file responsibility index (what each file owns, manages, and does NOT do)
-  - Remove stale "Status" section
-- [ ] Update `CLAUDE.md` — replace current architecture summary with:
-  - Reference to README as the codebase map
-  - Collaboration workflow rules (see Notes below)
-  - Keep the Commands section as-is
-
-### Collaboration workflow (to be written into CLAUDE.md)
-
-- **Discuss before code** — propose approach and affected files before making any edits; wait for approval
-- **Read CLAUDE_WIP.md at the start of each prompt** — Oskar may have edited it directly between sessions
-- **After any code edits, read README and update it** if the change affects file responsibilities, structure, or concepts
-- **Flag slow operations upfront** — if a task requires exploration or multi-file edits, say so before starting; ask Oskar if he knows the relevant file to save time
-- **Oskar commits between each prompt/response cycle** — the README diff serves as a human-readable summary of what structurally changed
+- [ ] Read and deeply understand the full codebase
+- [ ] Write the domain concept hierarchy section
+- [ ] Write the navigation and component tree section
+- [ ] Write the per-file responsibility index
+- [ ] Clean up stale/legacy content in the README (old Status section, "From old claude.md" heading etc.)
 
 ### Notes
 
-- `CLAUDE_WIP.md` lives at the repo root; both Oskar and Claude treat it as the source of truth for current work
-- `apps/statster/README.md` is the codebase map; detailed enough that Claude can locate where to make a change without searching files
+- This is a read-heavy task — explore freely
+- Accuracy matters more than speed; if something is unclear, check the source
+- Once done, this README becomes a living document: update it after every code change
