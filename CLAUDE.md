@@ -4,6 +4,8 @@
 
 We discuss ideas and plan before implementing. `CLAUDE_WIP.md` at the repo root is our shared task tracker — read it at the start of each prompt in case Oskar has made edits directly.
 
+**Markdown files are not code** — edit `.md` files freely without waiting for approval.
+
 **During planning** — avoid file exploration. Refer to `apps/statster/README.md` or ask Oskar as a first resort. This saves time and credits.
 
 **During implementation** — explore freely. Use whatever tools and operations are needed; Oskar may step away and leave you to it.
@@ -13,7 +15,7 @@ We discuss ideas and plan before implementing. `CLAUDE_WIP.md` at the repo root 
 ## Shared files
 
 - **`CLAUDE_WIP.md`** — the current task and its sub-steps as checkboxes. Read at the start of every prompt. Rewritten when starting a new task.
-- **`CLAUDE_TODO.md`** — persistent backlog: bugs, observations, future ideas. Add items freely; check them off as they get resolved.
+- **`CLAUDE_TODO.md`** — persistent backlog: bugs, observations, future ideas. Add items freely during any task; check them off as they get resolved. Read it at the start of each prompt alongside CLAUDE_WIP.
 
 ## Project
 

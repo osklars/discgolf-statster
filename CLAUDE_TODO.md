@@ -11,7 +11,7 @@
 ## Small observations
 
 - [ ] Sessions are created eagerly (a DB row is written) as soon as `SessionFormScreen` opens, before any entry is logged. This means abandoned sessions (navigating away immediately) leave orphan session rows.
-- [ ] `export.ts` + `shareSession.ts` implement a `.statster` JSON export shared via the iOS share sheet. The format is versioned (`version: 1`). Not yet documented anywhere.
+- [ ] `export.ts` + `shareSession.ts` implement a `.statster` JSON export shared via the iOS share sheet. The format is versioned (`version: 1`). Now documented in README.
 - [ ] `skillDb.ts` has a runtime migration baked in (`ALTER TABLE session ADD COLUMN name TEXT` wrapped in try/catch) rather than through a schema version. Fine for now but will need a proper migration strategy as the schema grows.
-- [ ] Add to claude.md that markdown-files are not code and do not need explicit "go" before editing. 
-- [ ] Add collab routines for how to use CLAUDE_TODO. 
+- [x] Add to claude.md that markdown-files are not code and do not need explicit "go" before editing.
+- [x] Add collab routines for how to use CLAUDE_TODO.
