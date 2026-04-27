@@ -10,6 +10,11 @@ We discuss ideas and plan before implementing. `CLAUDE_WIP.md` at the repo root 
 
 **After any code changes** — re-read `apps/statster/README.md` and update it to reflect what changed. Oskar commits between every prompt, so the README diff serves as his summary of what structurally changed.
 
+## Shared files
+
+- **`CLAUDE_WIP.md`** — the current task and its sub-steps as checkboxes. Read at the start of every prompt. Rewritten when starting a new task.
+- **`CLAUDE_TODO.md`** — persistent backlog: bugs, observations, future ideas. Add items freely; check them off as they get resolved.
+
 ## Project
 
 See `apps/statster/README.md` for the full architecture, domain concepts, and per-file responsibility index.
