@@ -74,8 +74,7 @@ Session
 └── "Continue session" button  → SessionForm (resumes existing session)
 
 StatDetail
-├── Filter chips               → refine the level/XP calculation in place
-└── Bookmark icon              → save current filters as a new SavedLevel
+└── Filter chips               → refine the level/XP calculation in place
 
 SessionForm                    ← wraps EntryForm, handles DB writes on each log
 ```
@@ -132,7 +131,7 @@ The core of the app. Loaded by `SessionFormScreen`. Has two top-level modes:
 | File | What it shows | Key behaviour |
 |------|--------------|---------------|
 | `HomeScreen.tsx` | Overall level, top 4 tracked levels, recent sessions | Reloads on focus; opens SkillSwitcherSheet inline |
-| `StatDetailScreen.tsx` | Level/XP breakdown for a filter set | Filter chips modify the query in place; bookmark saves as SavedLevel |
+| `StatDetailScreen.tsx` | Parameter overview + level summary for a filter set | Single `queryRichEntries` call drives all cards; named cards show top-2 options with occurrence bars (expandable accordion); scalar cards show a histogram with a two-handle range slider (handles roam freely, range = min–max of their positions); filtered params are removed from the card list and shown as dismissible chips in the summary card instead |
 | `SavedLevelsScreen.tsx` | All saved levels, reorderable | Top 4 appear on home screen |
 | `SessionScreen.tsx` | All entries in a session with XP per entry | Shows raw form_id as label (known issue); share exports `.statster` JSON |
 | `SessionFormScreen.tsx` | EntryForm wrapper | Creates a session lazily on first log, or continues an existing one; writes entry + datapoints to DB on each log |
@@ -156,7 +155,7 @@ Two SQLite databases, both in WAL mode:
 | `datapoints.ts` | `insertDatapoints` (bulk, transactional), `getDatapointsForEntry`. |
 | `sessions.ts` | `startSession`, `finishSession`, `renameSession`, `getSessions`, `getSession`, `getSessionsWithEntryCounts`. |
 | `savedLevels.ts` | CRUD + `reorderSavedLevels` for saved level filter presets. |
-| `queries.ts` | `queryEntries(filters)` — builds a dynamic JOIN query to return entries matching any combination of scalar range and named option filters. Used by `xp.ts`. |
+| `queries.ts` | `queryEntries(filters)` — dynamic JOIN query returning entries matching any filter combination. `queryRichEntries(filters)` — same but LEFT JOINs all datapoints and returns `RichEntry[]` for the stats view. |
 | `xp.ts` | XP computation and level curves. Never stores XP — always computed on demand. `BASE_XP = 40` per entry; multiplied by quality weights when quality params are present. `levelThreshold(n) = n*(n+1)/2 * 500`. |
 | `mappers.ts` | Bridge between DB types and EntryForm types. `loadFormDefinitions` assembles the full form tree (params + grid2ds, ordered). `saveFormDefinitionToDb` persists a FormDefinition. `formValuesToDatapoints` converts form values to scalar/named datapoint inputs. |
 | `types.ts` | TypeScript types for all DB entities (`ScalarParameter`, `NamedParameter`, `Form`, `Entry`, `Session`, etc.). |
@@ -174,6 +173,15 @@ Two SQLite databases, both in WAL mode:
 
 ---
 
+## Programming guidelines
+
+### Data fetching
+Prefer a single DB query that returns rich, fully-joined objects over multiple lazy per-component fetches. Pass the result down to child components which reduce it locally to compute what they need. This avoids layout jitter from staggered loading, reduces total state updates, and keeps the data flow easy to reason about.
+
+Applied pattern: `queryRichEntries(filters) → RichEntry[]` → passed to all param cards → each card does a local reduce.
+
+---
+
 ## Tech stack
 
 | Concern | Library |
@@ -185,3 +193,4 @@ Two SQLite databases, both in WAL mode:
 | Safe areas | react-native-safe-area-context |
 | Sharing | expo-sharing |
 | File system | expo-file-system |
+| SVG rendering | react-native-svg |

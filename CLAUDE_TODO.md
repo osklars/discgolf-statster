@@ -37,13 +37,9 @@ When a task is merged and done, delete its section entirely — the git log is t
 
 ---
 
-## Task: Parameter overview screen
+## Task: Restyle AddParamSheet to match param card design
 **Status:** idea
-**Description:** A screen that lists all scalar and named parameters defined in the active skill, with their configuration visible.
-**Notes:**
-- Navigation entry point unclear — from home screen? From within the form editor?
-- Read-only overview, or also an edit surface?
-- Could eventually be where you manage the global param library (currently only accessible via the form editor's AddParamSheet)
+**Description:** Once the parameter overview redesign is done, update `AddParamSheet` (form editor) to share the same card design language. Distribution data not needed here — it's a picker, not an overview.
 
 ---
 

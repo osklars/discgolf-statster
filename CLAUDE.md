@@ -29,7 +29,7 @@ git branch -D feature/<task-name>
 
 Claude creates the branch when a task moves into CLAUDE_WIP. Claude never pushes or merges without explicit approval.
 
-When a task is merged and done, delete its section from CLAUDE_TODO entirely — the git log is the history.
+When a task is merged and done, delete its section from CLAUDE_TODO entirely — the git log is the history. Same applies to completed sub-tasks in CLAUDE_WIP — remove them rather than checking them off.
 
 ## Shared files
 
