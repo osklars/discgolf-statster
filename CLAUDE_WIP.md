@@ -1,105 +1,73 @@
 # Current Work in Progress
 
 ## Data collection redesign
-**Branch:** (not started — planning phase)
-**Status:** proposal for review
+**Branch:** `feature/unified-session`
+**Status:** ready to implement
 
 ---
 
-### The core problem
+### Design decisions (settled)
 
-The current flow has two separate screens for what is really one activity — being in a session and logging throws. `SessionScreen` shows history, `SessionFormScreen` shows the form. You can't see both at once, and the form itself is noisy: all params are expanded all the time, the tab bar is large, and switching forms takes several taps.
-
----
-
-### Proposed: Unified session screen
-
-One screen replaces both `SessionScreen` and `SessionFormScreen`. It has three vertical zones:
-
+**Layout** — One `UnifiedSessionScreen` replaces both `SessionScreen` and `SessionFormScreen`:
 ```
 ┌─────────────────────────────┐
-│  Session header             │  name + compact progress (entry count, XP)
+│  Session header             │  name (tap to rename) + entry count + XP
 ├─────────────────────────────┤
-│                             │
-│  Entry feed (scrollable)    │  most recent entries, newest at top
-│                             │  tap any entry to edit it
-│                             │
+│  Entry feed  ↑ scroll up    │  oldest entries at top
+│  for older                  │
+│  ...                        │
+│  [most recent entry]        │  ← newest always at the bottom, closest to form
 ├─────────────────────────────┤
-│  Form area (fixed bottom)   │  always visible, never scrolls away
-│  [Form selector]            │
-│  [Param inputs]             │
+│  Form selector (pill strip) │  up to 4 pills + "more ▾" if needed
+│  Param rows (collapsed)     │  one expands at a time (accordion)
 │  [Log]                      │
 └─────────────────────────────┘
 ```
 
-**Entry feed**
-- Newest entry at the top, directly above the form area — you immediately see the last throw you logged
-- Each entry card is compact: form name + key values in one line, timestamp small
-- Tap → opens an edit sheet (pre-fills the form with that entry's values)
-- ⚠️ *Assumption: edit-entry is part of this redesign. If we want to ship the nav redesign first without editing, tap-to-edit can be stubbed with a "Coming soon" or just disabled for now.*
+**Hybrid pill selector** — applies to both form selector and named param input:
+- Show up to 4 options as tappable pills
+- If more exist, a "more ▾" pill opens a bottom sheet / inline list with all options
+- For named params: the 4 shown are the most frequently used in the current session (falls back to definition order on first entry)
+- For forms: show up to 4 forms in definition order; "more ▾" only appears with 5+
 
-**Form area**
-- Fixed to the bottom, always reachable without scrolling
-- Form selector: compact horizontal pill strip (replaces the current large tab bar). If only one form, no strip shown.
-- Param inputs: collapsed by default — each param is a single-line row showing its name and current value. Tap a row to expand it into its input. Only one param expanded at a time (same accordion pattern as the stat cards).
-- ⚠️ *Assumption: "sticky" params (clear_after_submit = false) show their persisted value in the collapsed row, making it easy to confirm they're still set correctly before logging.*
-- Log button: same as today — submits the current values and collapses all inputs back to their single-line state, ready for the next entry.
+**Collapsed param rows** — default state for all params in the form area:
+- Single line: param name on left, current value (or "—" if unset) on right
+- Tap to expand into the full input (PillPicker or ScalarInput)
+- Accordion: expanding one row collapses any other open row
+- Sticky params show their persisted value in the collapsed state, making it easy to confirm before logging
 
-**Session header**
-- Session name (tappable to rename, same as today)
-- Entry count + XP earned this session — no level curve here, just the raw numbers
-- ⚠️ *Assumption: no per-session mini stat graph in this iteration. That's a natural extension but would add scope.*
+**No grid2d** — grid2d params are skipped in the new form input. The underlying data stays in the DB; only the input widget is dropped for now. (Assumption: form edit mode access is deferred — details below.)
 
----
+**Entry feed** — compact cards, newest at the bottom (closest to the form). Each card shows the form name and a summary of values. Non-tappable in phase 1; tapping is wired up in phase 2 (edit entries).
 
-### Navigation change
+**Empty state** — when no entries yet, feed area shows a short muted prompt ("Your entries will appear here"). I'll set a placeholder and we can adjust on review.
 
-```
-Home
-├── "+ New session" → UnifiedSession (empty feed, form ready)
-└── Session row    → UnifiedSession (existing entries + form)
-```
+**Edit entries (phase 2, same branch)** — entry cards become tappable. Tap opens a bottom sheet pre-filled with that entry's values. On save, delete + re-insert the datapoints for that entry row. Entry timestamp and session membership are preserved.
 
-The old `SessionScreen` and `SessionFormScreen` are replaced by a single `UnifiedSessionScreen`. The "Continue session" concept disappears — navigating to an existing session always lands on this unified view, and the form is just there.
+**Form editing access** — the current edit mode lives inside EntryForm and is reached via the FormHeader. Since we're replacing the form host screen, form edit mode will be accessible via a settings icon in the session header (opens the existing edit flow). Assumption: this can be done with minimal changes to the EntryForm internals.
 
-⚠️ *Assumption: share session export moves to a header button on the unified screen (currently lives in SessionScreen).*
+**Share export** — moves to a button in the session header (was in the old SessionScreen).
 
 ---
 
-### Form area — param input detail
+### Implementation tasks
 
-Collapsed param row:
-```
-  Disc         [Destroyer    ]    ← named: shows current option
-  Distance     [68 m         ]    ← scalar: shows current value
-  Angle        [—            ]    ← empty / not yet set
-```
-
-Expanded param (tapped):
-```
-  Disc         ▲
-  ┌─────────────────────┐
-  │ Boss  Destroyer  DD │   ← pill picker / slider fills this space
-  └─────────────────────┘
-```
-
-⚠️ *Assumption: the expanded input uses the existing PillPicker / ScalarInput components — no new input widgets needed.*
-
-⚠️ *Assumption: grid2d params expand into their 2D input as before, just within the collapsed row pattern.*
-
----
-
-### What this unblocks
-
-- **Edit entry** — tap any entry in the feed to open an edit sheet. The sheet pre-fills the form values for that entry. On save, it replaces the datapoints for that entry row. This resolves the "Editable entries" task in the backlog.
-- **Session progress at a glance** — entry count and XP are visible without navigating away.
-- **Leaner form** — collapsing params by default removes most of the noise. Power users who fill in everything still can; casual users who only log one or two params per throw aren't confronted with the whole list at once.
-
----
-
-### Open questions (for Oskar to answer)
-
-1. **Edit or not in v1?** Edit-entry is implied by the tap-on-entry pattern. Should we build it in this iteration, stub it, or leave entries non-tappable for now?
-2. **Form selector style** — horizontal pill strip is the idea, but if someone has 4+ forms the strip could get cramped. Alternative: a single "Form ▾" dropdown. Which feels better?
-3. **Feed ordering** — newest at top (reverse chronological) feels right to me so the last throw is right above the form. Does that match your mental model, or do you prefer oldest-at-top so the session reads like a log?
-4. **Empty state** — when no entries yet, the feed area is blank. A short prompt ("Log your first throw below") or just empty space?
+- [ ] Create `feature/unified-session` branch
+- [ ] Add `UnifiedSession` route to `AppNavigator` and `types.ts`; wire Home navigation targets to it
+- [ ] Build `UnifiedSessionScreen` skeleton: header + scrollable feed + sticky form footer
+- [ ] Entry feed: load entries + datapoints for the session, render compact cards (non-tappable), newest at bottom
+- [ ] Session header: name (rename on tap), entry count, session XP
+- [ ] Form selector: hybrid pill strip (up to 4 + "more ▾")
+- [ ] Collapsed param rows + accordion expansion (skip grid2d params)
+- [ ] Named param input: hybrid pill picker (top-4 by session frequency + "more ▾")
+- [ ] Sticky value display in collapsed rows; sticky values persist across entries
+- [ ] Log button: write entry + datapoints, append new card to feed
+- [ ] Empty feed placeholder text
+- [ ] Share export button in header
+- [ ] Form edit mode access via settings icon in header
+- [ ] Remove old `SessionScreen` and `SessionFormScreen` once unified screen covers all functionality
+- [ ] **Phase 2 — edit entries:**
+  - [ ] Make entry cards tappable
+  - [ ] Edit sheet: pre-fill form values from existing datapoints
+  - [ ] On save: delete existing datapoints for entry, re-insert new ones
+- [ ] Update README
