@@ -12,6 +12,25 @@ We discuss ideas and plan before implementing. `CLAUDE_WIP.md` at the repo root 
 
 **After any code changes** — re-read `apps/statster/README.md` and update it to reflect what changed. Oskar commits between every prompt, so the README diff serves as his summary of what structurally changed.
 
+## Git workflow
+
+Each WIP task gets its own branch. When the task is done, squash merge to main and delete the branch.
+
+```bash
+# Start a task
+git checkout -b feature/<task-name>
+
+# Finish a task
+git checkout main
+git merge --squash feature/<task-name>
+git commit -m "<clean summary message>"
+git branch -d feature/<task-name>
+```
+
+Claude creates the branch when a task moves into CLAUDE_WIP. Claude never pushes or merges without explicit approval.
+
+When a task is merged and done, delete its section from CLAUDE_TODO entirely — the git log is the history.
+
 ## Shared files
 
 - **`CLAUDE_WIP.md`** — the current task and its sub-steps as checkboxes. Read at the start of every prompt. Rewritten when starting a new task.

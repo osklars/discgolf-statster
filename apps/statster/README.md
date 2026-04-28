@@ -39,7 +39,7 @@ Named layout templates within a skill. A form is an ordered list of parameters (
 
 ### Sessions
 
-A practice session groups entries together. Created as soon as `SessionFormScreen` is opened, before any entry is logged. Sessions can be named, and can be shared as a `.statster` JSON export.
+A practice session groups entries together. Created lazily on the first logged entry — navigating to `SessionFormScreen` and leaving without logging anything leaves no orphan session rows. Sessions can be named, and can be shared as a `.statster` JSON export.
 
 ### Entries
 
@@ -135,7 +135,7 @@ The core of the app. Loaded by `SessionFormScreen`. Has two top-level modes:
 | `StatDetailScreen.tsx` | Level/XP breakdown for a filter set | Filter chips modify the query in place; bookmark saves as SavedLevel |
 | `SavedLevelsScreen.tsx` | All saved levels, reorderable | Top 4 appear on home screen |
 | `SessionScreen.tsx` | All entries in a session with XP per entry | Shows raw form_id as label (known issue); share exports `.statster` JSON |
-| `SessionFormScreen.tsx` | EntryForm wrapper | Creates or continues a session; writes entry + datapoints to DB on each log |
+| `SessionFormScreen.tsx` | EntryForm wrapper | Creates a session lazily on first log, or continues an existing one; writes entry + datapoints to DB on each log |
 
 ---
 

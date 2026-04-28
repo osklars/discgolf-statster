@@ -1,14 +1,8 @@
 # Backlog
 
-Tasks move through: **idea → ready → in progress → done**
+Tasks move through: **idea → ready → in progress**
 A task is `ready` when there are no blocking open questions and it can go straight into CLAUDE_WIP.
-
----
-
-## Task: Lazy session creation
-**Status:** ready
-**Description:** Sessions should be created with the first logged entry, not when `SessionFormScreen` opens. Currently a session row is written to the DB immediately on screen mount, leaving orphan rows if the user navigates away without logging anything.
-**Change:** Move `startSession()` call from `SessionFormScreen` mount into the `handleLogThrow` callback, triggered only on first entry.
+When a task is merged and done, delete its section entirely — the git log is the history.
 
 ---
 

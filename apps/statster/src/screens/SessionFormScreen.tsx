@@ -25,10 +25,6 @@ export function SessionFormScreen({ navigation, route }: Props) {
       getEntriesForSession(existingSessionId)
         .then((entries) => setEntryCount(entries.length))
         .catch(console.error);
-    } else {
-      startSession().then((session) => {
-        sessionIdRef.current = session.id;
-      }).catch(console.error);
     }
   }, [existingSessionId]);
 
@@ -37,11 +33,13 @@ export function SessionFormScreen({ navigation, route }: Props) {
     params: Param[],
     values: Record<string, ParamValue>,
   ) => {
-    const sessionId = sessionIdRef.current;
-    if (!sessionId) return;
+    if (!sessionIdRef.current) {
+      const session = await startSession();
+      sessionIdRef.current = session.id;
+    }
 
     const nextCount = entryCount + 1;
-    const entry = await createEntry(sessionId, formId, nextCount);
+    const entry = await createEntry(sessionIdRef.current, formId, nextCount);
     const { scalars, named } = formValuesToDatapoints(values, params);
     await insertDatapoints(entry.id, scalars, named);
     setEntryCount(nextCount);
