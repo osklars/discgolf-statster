@@ -2,72 +2,81 @@
 
 ## Data collection redesign
 **Branch:** `feature/unified-session`
-**Status:** ready to implement
+**Status:** in progress
 
 ---
 
-### Design decisions (settled)
+### Design (settled)
 
-**Layout** — One `UnifiedSessionScreen` replaces both `SessionScreen` and `SessionFormScreen`:
+**Layout**
 ```
 ┌─────────────────────────────┐
-│  Session header             │  name (tap to rename) + entry count + XP
+│  Session header             │  name (tap to rename) · entry count · XP
 ├─────────────────────────────┤
-│  Entry feed  ↑ scroll up    │  oldest entries at top
-│  for older                  │
+│  Entry feed  ↑ older        │
 │  ...                        │
-│  [most recent entry]        │  ← newest always at the bottom, closest to form
+│  [most recent entry]        │  ← newest at bottom, closest to form
 ├─────────────────────────────┤
-│  Form selector (pill strip) │  up to 4 pills + "more ▾" if needed
-│  Param rows (collapsed)     │  one expands at a time (accordion)
+│  [Form selector — pills]    │
+│  [Param rows — collapsed]   │  one expands at a time
+│  [+ Add param for entry]    │  one-off param, not saved to form def
 │  [Log]                      │
 └─────────────────────────────┘
 ```
 
-**Hybrid pill selector** — applies to both form selector and named param input:
-- Show up to 4 options as tappable pills
-- If more exist, a "more ▾" pill opens a bottom sheet / inline list with all options
-- For named params: the 4 shown are the most frequently used in the current session (falls back to definition order on first entry)
-- For forms: show up to 4 forms in definition order; "more ▾" only appears with 5+
+**FittingPills** — reused for both form selector and named param input:
+- Measures all pill widths (invisible first pass)
+- Shows as many as fit in the available width
+- If any overflow: a "more ▾" pill appears (taking its own space), overflow items go into a bottom sheet showing all options
+- A "+" pill always appears at the end — adds a new option (named_option to DB) or a new form
 
-**Collapsed param rows** — default state for all params in the form area:
-- Single line: param name on left, current value (or "—" if unset) on right
-- Tap to expand into the full input (PillPicker or ScalarInput)
-- Accordion: expanding one row collapses any other open row
-- Sticky params show their persisted value in the collapsed state, making it easy to confirm before logging
+**Collapsed param rows** — accordion, one open at a time:
+- Shows param name + current value (or "—")
+- Sticky params show persisted value in collapsed state
+- Scalar: expands into ScalarInput
+- Named: expands into FittingPills
+- Grid2d: skipped in this design
 
-**No grid2d** — grid2d params are skipped in the new form input. The underlying data stays in the DB; only the input widget is dropped for now. (Assumption: form edit mode access is deferred — details below.)
+**One-off params** — "+" below the param list:
+- Opens a sheet with skill params not currently in the form
+- Selected param appears as an expanded row for this entry only
+- Cleared after Log; never written to the form definition
 
-**Entry feed** — compact cards, newest at the bottom (closest to the form). Each card shows the form name and a summary of values. Non-tappable in phase 1; tapping is wired up in phase 2 (edit entries).
+**Edit entries (phase 2, same branch)** — entry cards start non-tappable; wired up after layout is solid.
 
-**Empty state** — when no entries yet, feed area shows a short muted prompt ("Your entries will appear here"). I'll set a placeholder and we can adjust on review.
-
-**Edit entries (phase 2, same branch)** — entry cards become tappable. Tap opens a bottom sheet pre-filled with that entry's values. On save, delete + re-insert the datapoints for that entry row. Entry timestamp and session membership are preserved.
-
-**Form editing access** — the current edit mode lives inside EntryForm and is reached via the FormHeader. Since we're replacing the form host screen, form edit mode will be accessible via a settings icon in the session header (opens the existing edit flow). Assumption: this can be done with minimal changes to the EntryForm internals.
-
-**Share export** — moves to a button in the session header (was in the old SessionScreen).
+**Empty feed** — muted placeholder text: "Your entries will appear here"
 
 ---
 
-### Implementation tasks
+### Tasks
 
-- [ ] Create `feature/unified-session` branch
-- [ ] Add `UnifiedSession` route to `AppNavigator` and `types.ts`; wire Home navigation targets to it
-- [ ] Build `UnifiedSessionScreen` skeleton: header + scrollable feed + sticky form footer
-- [ ] Entry feed: load entries + datapoints for the session, render compact cards (non-tappable), newest at bottom
-- [ ] Session header: name (rename on tap), entry count, session XP
-- [ ] Form selector: hybrid pill strip (up to 4 + "more ▾")
-- [ ] Collapsed param rows + accordion expansion (skip grid2d params)
-- [ ] Named param input: hybrid pill picker (top-4 by session frequency + "more ▾")
-- [ ] Sticky value display in collapsed rows; sticky values persist across entries
-- [ ] Log button: write entry + datapoints, append new card to feed
-- [ ] Empty feed placeholder text
+- [ ] Create branch, add `UnifiedSession` to `AppNavigator` + `types.ts`, wire Home navigation
+- [ ] `FittingPills` component (measure → fit → overflow sheet)
+- [ ] `UnifiedSessionScreen` skeleton: header + scrollable feed + sticky form footer
+- [ ] Session header: rename on tap, entry count, XP
+- [ ] Entry feed: compact `EntryCard`, load from DB, empty state
+- [ ] Form selector as `FittingPills` (forms as items, active form highlighted)
+- [ ] `ParamRow`: collapsed display + accordion expand
+- [ ] Named param input: `FittingPills` for options
+- [ ] Scalar param input: reuse `ScalarInput`
+- [ ] Sticky values: persist across Log, reset on form switch
+- [ ] Log: write entry + datapoints, append card to feed
+- [ ] One-off param: "+ Add param" → sheet → param appears for this entry only
 - [ ] Share export button in header
-- [ ] Form edit mode access via settings icon in header
-- [ ] Remove old `SessionScreen` and `SessionFormScreen` once unified screen covers all functionality
+- [ ] Remove `SessionScreen` + `SessionFormScreen` once covered
 - [ ] **Phase 2 — edit entries:**
-  - [ ] Make entry cards tappable
-  - [ ] Edit sheet: pre-fill form values from existing datapoints
-  - [ ] On save: delete existing datapoints for entry, re-insert new ones
+  - [ ] Entry cards tappable
+  - [ ] Edit sheet pre-filled from existing datapoints
+  - [ ] Save: delete + re-insert datapoints
 - [ ] Update README
+
+---
+
+### File plan
+
+```
+src/screens/UnifiedSessionScreen.tsx
+src/components/session/FittingPills.tsx
+src/components/session/ParamRow.tsx
+src/components/session/EntryCard.tsx
+```
