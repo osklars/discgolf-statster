@@ -24,7 +24,7 @@ git checkout -b feature/<task-name>
 git checkout main
 git merge --squash feature/<task-name>
 git commit -m "<clean summary message>"
-git branch -d feature/<task-name>
+git branch -D feature/<task-name>
 ```
 
 Claude creates the branch when a task moves into CLAUDE_WIP. Claude never pushes or merges without explicit approval.
