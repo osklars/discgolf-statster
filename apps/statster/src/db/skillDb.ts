@@ -16,6 +16,9 @@ export async function openSkillDb(dbFile: string): Promise<SQLite.SQLiteDatabase
   _dbFile = dbFile;
   await _db.execAsync(SKILL_DB_SCHEMA);
   try { await _db.execAsync('ALTER TABLE session ADD COLUMN name TEXT'); } catch {}
+  try { await _db.execAsync('ALTER TABLE scalar_parameter ADD COLUMN archived_at TEXT'); } catch {}
+  try { await _db.execAsync('ALTER TABLE named_parameter ADD COLUMN archived_at TEXT'); } catch {}
+  try { await _db.execAsync('ALTER TABLE form ADD COLUMN archived_at TEXT'); } catch {}
 
   return _db;
 }

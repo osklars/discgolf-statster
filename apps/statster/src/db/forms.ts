@@ -41,9 +41,24 @@ function toGrid2D(r: Grid2DRow): FormGrid2D {
 
 export async function getForms(): Promise<Form[]> {
   const rows = await getSkillDb().getAllAsync<FormRow>(
-    'SELECT * FROM form ORDER BY sort_order ASC, created_at ASC',
+    'SELECT * FROM form WHERE archived_at IS NULL ORDER BY sort_order ASC, created_at ASC',
   );
   return rows.map(toForm);
+}
+
+export async function getArchivedForms(): Promise<Form[]> {
+  const rows = await getSkillDb().getAllAsync<FormRow>(
+    'SELECT * FROM form WHERE archived_at IS NOT NULL ORDER BY name ASC',
+  );
+  return rows.map(toForm);
+}
+
+export async function archiveForm(id: string): Promise<void> {
+  await getSkillDb().runAsync('UPDATE form SET archived_at = ? WHERE id = ?', [new Date().toISOString(), id]);
+}
+
+export async function restoreForm(id: string): Promise<void> {
+  await getSkillDb().runAsync('UPDATE form SET archived_at = NULL WHERE id = ?', [id]);
 }
 
 export async function upsertForm(

@@ -2,10 +2,10 @@ import React, { useCallback, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
 import { Circle, Line, Svg, Text as SvgText } from 'react-native-svg';
 import { Colors, Spacing, Typography } from '../../../../constants/theme';
-import type { QualityParam, ScalarParam } from '../../types';
+import type { ScalarParam } from '../../types';
 
 interface Props {
-  param: ScalarParam | QualityParam;
+  param: ScalarParam;
   value: number | undefined;
   onDragStart: () => void;
   onLiveUpdate: (value: number) => void;
@@ -18,8 +18,6 @@ const DOT_R = 7;
 const TICK_H_MAJOR = 8;
 const PAD = Spacing.lg;
 const TRACK_SIZE = 200;
-const DOT_HIT_SLOP = 12;
-const TAP_THRESHOLD = 8;
 
 function snapToStep(raw: number, min: number, max: number, step: number): number {
   const steps = Math.round((raw - min) / step);
@@ -37,11 +35,6 @@ export function ScalarInput({ param, value, onDragStart, onLiveUpdate, onCommit 
   const pageOffsetX = useRef(0);
   const widthRef = useRef(300);
   const trackX0Ref = useRef(0);
-  const valueRef = useRef<number | undefined>(value);
-  valueRef.current = value;
-
-  // Tracks whether the current gesture started on the dot.
-  const isDotDragRef = useRef(false);
 
   const trackWidthFor = (w: number) => Math.min(w - PAD * 2, TRACK_SIZE);
   const trackX0For = (w: number) => (w - trackWidthFor(w)) / 2;
@@ -54,58 +47,35 @@ export function ScalarInput({ param, value, onDragStart, onLiveUpdate, onCommit 
     return snapToStep(raw, min, max, step);
   };
 
-  const dotRelX = (): number => {
-    const v = liveValueRef.current ?? valueRef.current;
-    if (v === undefined) return -9999;
-    return trackX0Ref.current + ((v - min) / (max - min)) * trackWidthFor(widthRef.current);
-  };
-
   const panResponder = useRef(
     PanResponder.create({
-      // Always claim the touch — SVG has no competing responder.
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => false,
-
-      // Yield to the ScrollView for vertical scrolls, but hold on during dot drag.
-      onPanResponderTerminationRequest: () => !isDotDragRef.current,
+      // Never yield mid-interaction so the dot follows the finger anywhere
+      onPanResponderTerminationRequest: () => false,
 
       onPanResponderGrant: (evt) => {
-        const relX = evt.nativeEvent.pageX - pageOffsetX.current;
-        isDotDragRef.current =
-          valueRef.current !== undefined &&
-          Math.abs(relX - dotRelX()) <= DOT_R + DOT_HIT_SLOP;
-        if (isDotDragRef.current) {
-          onDragStart(); // disables ScrollView scroll for the duration of the drag
-        }
-      },
-
-      onPanResponderMove: (evt) => {
-        if (!isDotDragRef.current) return;
+        onDragStart();
         const v = valueFromPageX(evt.nativeEvent.pageX);
         liveValueRef.current = v;
         forceUpdate((n) => n + 1);
         onLiveUpdate(v);
       },
 
-      onPanResponderRelease: (evt, gestureState) => {
-        const wasDotDrag = isDotDragRef.current;
-        isDotDragRef.current = false;
-        const isTap =
-          Math.abs(gestureState.dx) <= TAP_THRESHOLD &&
-          Math.abs(gestureState.dy) <= TAP_THRESHOLD;
-
-        liveValueRef.current = null;
+      onPanResponderMove: (evt) => {
+        const v = valueFromPageX(evt.nativeEvent.pageX);
+        liveValueRef.current = v;
         forceUpdate((n) => n + 1);
-
-        if (isTap || wasDotDrag) {
-          onCommit(valueFromPageX(evt.nativeEvent.pageX));
-        }
-        // else: horizontal swipe not on dot — ignore
+        onLiveUpdate(v);
       },
 
-      // ScrollView stole the responder — clean up without committing.
+      onPanResponderRelease: (evt) => {
+        liveValueRef.current = null;
+        forceUpdate((n) => n + 1);
+        onCommit(valueFromPageX(evt.nativeEvent.pageX));
+      },
+
       onPanResponderTerminate: () => {
-        isDotDragRef.current = false;
         liveValueRef.current = null;
         forceUpdate((n) => n + 1);
       },

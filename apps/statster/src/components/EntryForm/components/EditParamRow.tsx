@@ -22,7 +22,6 @@ const TYPE_LABELS: Record<Param['type'], string> = {
   scalar: 'scalar',
   named: 'named',
   grid2d: '2D',
-  quality: 'quality',
 };
 
 export function EditParamRow({

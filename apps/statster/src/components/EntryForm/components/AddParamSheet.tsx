@@ -1,12 +1,12 @@
 import React from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Colors, MIN_HIT, Spacing, Typography, hairline } from '../../../constants/theme';
-import type { NamedParam, QualityParam, ScalarParam } from '../types';
+import type { NamedParam, ScalarParam } from '../types';
 
 interface Props {
   visible: boolean;
-  available: (ScalarParam | NamedParam | QualityParam)[];
-  onAdd: (param: ScalarParam | NamedParam | QualityParam) => void;
+  available: (ScalarParam | NamedParam)[];
+  onAdd: (param: ScalarParam | NamedParam) => void;
   onCreateNew: () => void;
   onClose: () => void;
 }

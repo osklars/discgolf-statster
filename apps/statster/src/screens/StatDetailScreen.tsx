@@ -21,8 +21,7 @@ import Svg, { Rect } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { Colors, Radius, Spacing, Typography, hairline } from '../constants/theme';
-import { getLevelSummary, xpToLevel } from '../db/xp';
-import type { LevelSummary } from '../db/xp';
+import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { queryRichEntries } from '../db/queries';
 import type { RichEntry } from '../db/queries';
 import { getScalarParameters, getNamedParameters, getAllNamedOptions } from '../db/parameters';
@@ -53,28 +52,13 @@ function filtersToQuery(filters: ActiveFilter[]) {
 
 // ── Summary card ──────────────────────────────────────────────────────────────
 
-function ProgressBar({ progress }: { progress: number }) {
-  const clamped = Math.min(1, Math.max(0, progress));
-  return (
-    <View style={bar.track}>
-      <View style={[bar.fill, { flex: clamped }]} />
-      <View style={{ flex: 1 - clamped }} />
-    </View>
-  );
-}
-const bar = StyleSheet.create({
-  track: { flexDirection: 'row', height: 6, borderRadius: 3, backgroundColor: Colors.separator, overflow: 'hidden' },
-  fill: { backgroundColor: Colors.primary, borderRadius: 3 },
-});
-
 interface SummaryCardProps {
-  levelSummary: LevelSummary | null;
+  entryCount: number | null;
   filters: ActiveFilter[];
   onRemoveFilter: (f: ActiveFilter) => void;
 }
 
-function SummaryCard({ levelSummary, filters, onRemoveFilter }: SummaryCardProps) {
-  const levelInfo = levelSummary ? xpToLevel(levelSummary.totalXp) : null;
+function SummaryCard({ entryCount, filters, onRemoveFilter }: SummaryCardProps) {
   return (
     <View style={summary.card}>
       <View style={summary.chipRow}>
@@ -91,44 +75,17 @@ function SummaryCard({ levelSummary, filters, onRemoveFilter }: SummaryCardProps
           </ScrollView>
         )}
       </View>
-
-      {levelInfo ? (
-        <>
-          <View style={summary.levelRow}>
-            <Text style={summary.levelNumber}>{levelInfo.level}</Text>
-            <View style={summary.levelMeta}>
-              <ProgressBar progress={levelInfo.progress} />
-              <Text style={summary.levelSub}>
-                {Math.round(levelInfo.progress * 100)}% · {levelSummary!.entryCount} entries · {levelSummary!.totalXp} XP
-              </Text>
-            </View>
-          </View>
-          {levelSummary!.qualityAverages.length > 0 && (
-            <View style={summary.qualityRow}>
-              {levelSummary!.qualityAverages.map((qa) => {
-                const sign = qa.avgValue >= 0 ? '+' : '';
-                const display = (qa.target === qa.max || qa.target === qa.min)
-                  ? `${qa.avgValue.toFixed(1)}/${qa.target}`
-                  : `${sign}${qa.avgValue.toFixed(1)}`;
-                return (
-                  <View key={qa.paramId} style={summary.qualityItem}>
-                    <Text style={summary.qualityName}>{qa.name}</Text>
-                    <Text style={summary.qualityValue}>{display}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-        </>
+      {entryCount !== null ? (
+        <Text style={summary.entryCount}>{entryCount} {entryCount === 1 ? 'entry' : 'entries'}</Text>
       ) : (
-        <ActivityIndicator color={Colors.primary} style={{ marginVertical: Spacing.lg }} />
+        <ActivityIndicator color={Colors.primary} style={{ marginVertical: Spacing.sm }} />
       )}
     </View>
   );
 }
 
 const summary = StyleSheet.create({
-  card: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, gap: Spacing.md },
+  card: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, gap: Spacing.sm },
   chipRow: { minHeight: 28, justifyContent: 'center' },
   chipScroll: { gap: Spacing.sm, flexDirection: 'row' },
   overallLabel: { ...Typography.label, color: Colors.textMuted, fontWeight: '600' },
@@ -139,14 +96,7 @@ const summary = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.primaryBorder,
   },
   chipText: { ...Typography.labelSm, color: Colors.primary, fontWeight: '600' },
-  levelRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.lg },
-  levelNumber: { fontSize: 52, fontWeight: '800', color: Colors.primary, lineHeight: 56 },
-  levelMeta: { flex: 1, gap: Spacing.xs },
-  levelSub: { ...Typography.labelSm, color: Colors.textMuted },
-  qualityRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
-  qualityItem: { gap: 2 },
-  qualityName: { ...Typography.labelSm, color: Colors.textMuted, fontSize: 10 },
-  qualityValue: { ...Typography.labelSm, color: Colors.text, fontWeight: '600' },
+  entryCount: { ...Typography.label, color: Colors.textMuted },
 });
 
 // ── Shared card primitives ────────────────────────────────────────────────────
@@ -503,7 +453,7 @@ export function StatDetailScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [filters, setFilters] = useState<ActiveFilter[]>([]);
   const [entries, setEntries] = useState<RichEntry[]>([]);
-  const [levelSummary, setLevelSummary] = useState<LevelSummary | null>(null);
+  const [entryCount, setEntryCount] = useState<number | null>(null);
   const [scalarParams, setScalarParams] = useState<ScalarParameter[]>([]);
   const [namedParams, setNamedParams] = useState<NamedParameter[]>([]);
   const [allOptions, setAllOptions] = useState<NamedOption[]>([]);
@@ -523,14 +473,7 @@ export function StatDetailScreen({ navigation }: Props) {
 
   const reload = useCallback(async (activeFilters: ActiveFilter[]) => {
     const query = filtersToQuery(activeFilters);
-    const [richEntries, levSummary] = await Promise.all([
-      queryRichEntries(query),
-      getLevelSummary(
-        activeFilters
-          .filter((f): f is NamedFilter => f.type === 'named')
-          .map((f) => ({ parameterId: f.parameterId, optionId: f.optionId })),
-      ),
-    ]);
+    const richEntries = await queryRichEntries(query);
     const counts: Record<string, number> = {};
     for (const entry of richEntries) {
       const seen = new Set<string>();
@@ -542,7 +485,7 @@ export function StatDetailScreen({ navigation }: Props) {
       }
     }
     setEntries(richEntries);
-    setLevelSummary(levSummary);
+    setEntryCount(richEntries.length);
     setParamEntryCount(counts);
     setInitialLoading(false);
   }, []);
@@ -586,20 +529,22 @@ export function StatDetailScreen({ navigation }: Props) {
 
   if (initialLoading) {
     return (
-      <View style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator color={Colors.primary} />
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <ScreenHeader title="Stats" onBack={() => navigation.goBack()} />
+        <ActivityIndicator color={Colors.primary} style={{ flex: 1 }} />
       </View>
     );
   }
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      <ScreenHeader title="Stats" onBack={() => navigation.goBack()} />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.xl }]}
         showsVerticalScrollIndicator={false}
       >
-        <SummaryCard levelSummary={levelSummary} filters={filters} onRemoveFilter={removeFilter} />
+        <SummaryCard entryCount={entryCount} filters={filters} onRemoveFilter={removeFilter} />
 
         {sortedNamed.map((param) => {
           const options = allOptions.filter((o) => o.parameterId === param.id && o.archivedAt === null);

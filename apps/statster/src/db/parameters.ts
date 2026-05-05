@@ -78,9 +78,27 @@ export async function upsertScalarParameter(
 
 export async function getScalarParameters(): Promise<ScalarParameter[]> {
   const rows = await getSkillDb().getAllAsync<ScalarRow>(
-    'SELECT * FROM scalar_parameter ORDER BY name ASC',
+    'SELECT * FROM scalar_parameter WHERE archived_at IS NULL ORDER BY name ASC',
   );
   return rows.map(toScalar);
+}
+
+export async function getArchivedScalarParameters(): Promise<ScalarParameter[]> {
+  const rows = await getSkillDb().getAllAsync<ScalarRow>(
+    'SELECT * FROM scalar_parameter WHERE archived_at IS NOT NULL ORDER BY name ASC',
+  );
+  return rows.map(toScalar);
+}
+
+export async function archiveScalarParameter(id: string): Promise<void> {
+  await getSkillDb().runAsync(
+    'UPDATE scalar_parameter SET archived_at = ? WHERE id = ?',
+    [new Date().toISOString(), id],
+  );
+}
+
+export async function restoreScalarParameter(id: string): Promise<void> {
+  await getSkillDb().runAsync('UPDATE scalar_parameter SET archived_at = NULL WHERE id = ?', [id]);
 }
 
 export async function deleteScalarParameter(id: string): Promise<void> {
@@ -104,9 +122,27 @@ export async function upsertNamedParameter(
 
 export async function getNamedParameters(): Promise<NamedParameter[]> {
   const rows = await getSkillDb().getAllAsync<NamedRow>(
-    'SELECT * FROM named_parameter ORDER BY name ASC',
+    'SELECT * FROM named_parameter WHERE archived_at IS NULL ORDER BY name ASC',
   );
   return rows.map(toNamed);
+}
+
+export async function getArchivedNamedParameters(): Promise<NamedParameter[]> {
+  const rows = await getSkillDb().getAllAsync<NamedRow>(
+    'SELECT * FROM named_parameter WHERE archived_at IS NOT NULL ORDER BY name ASC',
+  );
+  return rows.map(toNamed);
+}
+
+export async function archiveNamedParameter(id: string): Promise<void> {
+  await getSkillDb().runAsync(
+    'UPDATE named_parameter SET archived_at = ? WHERE id = ?',
+    [new Date().toISOString(), id],
+  );
+}
+
+export async function restoreNamedParameter(id: string): Promise<void> {
+  await getSkillDb().runAsync('UPDATE named_parameter SET archived_at = NULL WHERE id = ?', [id]);
 }
 
 export async function deleteNamedParameter(id: string): Promise<void> {
@@ -124,7 +160,7 @@ export async function upsertNamedOption(
     `INSERT INTO named_option (id, parameter_id, label, sort_order, archived_at)
      VALUES (?, ?, ?, ?, NULL)
      ON CONFLICT(id) DO UPDATE SET
-       label=excluded.label, sort_order=excluded.sort_order`,
+       label=excluded.label, sort_order=excluded.sort_order, archived_at=NULL`,
     [option.id, option.parameterId, option.label, option.sortOrder],
   );
   return option;
@@ -136,6 +172,10 @@ export async function getNamedOptions(parameterId: string): Promise<NamedOption[
     [parameterId],
   );
   return rows.map(toOption);
+}
+
+export async function deleteNamedOption(id: string): Promise<void> {
+  await getSkillDb().runAsync('DELETE FROM named_option WHERE id = ?', [id]);
 }
 
 export async function archiveNamedOption(id: string): Promise<void> {

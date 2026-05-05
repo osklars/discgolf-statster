@@ -70,8 +70,7 @@ export function useEntryForm(params: Param[], initialValues?: Record<string, Par
     (param: Param, raw: ParamValue | undefined): string => {
       if (raw === undefined || raw === '') return '';
       switch (param.type) {
-        case 'scalar':
-        case 'quality': {
+        case 'scalar': {
           const n = parseFloat(raw);
           if (isNaN(n)) return raw;
           const formatted = Number.isInteger(n) ? String(n) : n.toFixed(1);

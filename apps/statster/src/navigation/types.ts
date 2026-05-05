@@ -6,6 +6,8 @@ export type RootStackParamList = {
   Home: undefined;
   StatDetail: { filters?: SavedLevelFilter[] } | undefined;
   SavedLevels: undefined;
-  Session: { sessionId: string };
-  SessionForm: { sessionId?: string } | undefined;
+  UnifiedSession: { sessionId?: string } | undefined;
+  Forms: undefined;
+  FormEditor: { formId: string; isNew?: boolean; sortOrder?: number };
+  ParamEditor: { paramType: 'scalar' | 'named'; paramId?: string; addToFormId?: string; initialName?: string };
 };

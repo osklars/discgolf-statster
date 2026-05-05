@@ -43,6 +43,10 @@ export async function getEntriesForSession(sessionId: string): Promise<Entry[]> 
   return rows.map(toEntry);
 }
 
+export async function updateEntryFormId(id: string, formId: string): Promise<void> {
+  await getSkillDb().runAsync('UPDATE entry SET form_id = ? WHERE id = ?', [formId, id]);
+}
+
 export async function deleteEntry(id: string): Promise<void> {
   await getSkillDb().runAsync('DELETE FROM entry WHERE id = ?', [id]);
 }

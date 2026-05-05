@@ -51,6 +51,14 @@ export async function insertDatapoints(
   return { scalars: insertedScalars, named: insertedNamed };
 }
 
+export async function deleteDatapointsForEntry(entryId: string): Promise<void> {
+  const db = getSkillDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM scalar_datapoint WHERE entry_id = ?', [entryId]);
+    await db.runAsync('DELETE FROM named_datapoint WHERE entry_id = ?', [entryId]);
+  });
+}
+
 export async function getDatapointsForEntry(entryId: string): Promise<DatapointsForEntry> {
   const db = getSkillDb();
   const [scalars, named] = await Promise.all([

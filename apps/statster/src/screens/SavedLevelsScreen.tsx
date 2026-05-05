@@ -12,6 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { Colors, MIN_HIT, Radius, Spacing, Typography, hairline } from '../constants/theme';
+import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { getSavedLevels, deleteSavedLevel, reorderSavedLevels } from '../db/savedLevels';
 import type { SavedLevel } from '../db/savedLevels';
 
@@ -49,15 +50,17 @@ export function SavedLevelsScreen({ navigation }: Props) {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={Colors.primary} />
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <ScreenHeader title="Saved Levels" onBack={() => navigation.goBack()} />
+        <ActivityIndicator color={Colors.primary} style={{ flex: 1 }} />
       </View>
     );
   }
 
   return (
-    <View style={[styles.root, { paddingBottom: insets.bottom + Spacing.lg }]}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      <ScreenHeader title="Saved Levels" onBack={() => navigation.goBack()} />
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.lg }]} showsVerticalScrollIndicator={false}>
         <Text style={styles.hint}>
           The top 4 saved levels appear on the home screen. Reorder to choose which ones show.
         </Text>

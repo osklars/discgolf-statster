@@ -62,17 +62,18 @@ export async function queryEntries(filters: EntryQueryFilters): Promise<Entry[]>
 
 // ── Rich entries ──────────────────────────────────────────────────────────────
 
-export type RichEntryScalar = { parameterId: string; paramName: string; value: number };
+export type RichEntryScalar = { parameterId: string; paramName: string; value: number; unit: string | null };
 export type RichEntryNamed  = { parameterId: string; paramName: string; optionId: string; optionLabel: string };
 
 export type RichEntry = {
   id: string;
+  formId: string;
   loggedAt: string;
   scalars: RichEntryScalar[];
   named: RichEntryNamed[];
 };
 
-type ScalarDpRow = { entry_id: string; parameter_id: string; param_name: string; value: number };
+type ScalarDpRow = { entry_id: string; parameter_id: string; param_name: string; value: number; unit: string | null };
 type NamedDpRow  = { entry_id: string; parameter_id: string; param_name: string; option_id: string; option_label: string };
 
 /**
@@ -90,7 +91,7 @@ export async function queryRichEntries(filters: EntryQueryFilters): Promise<Rich
 
   const [scalarRows, namedRows] = await Promise.all([
     db.getAllAsync<ScalarDpRow>(
-      `SELECT sd.entry_id, sd.parameter_id, sp.name AS param_name, sd.value
+      `SELECT sd.entry_id, sd.parameter_id, sp.name AS param_name, sd.value, sp.unit
        FROM scalar_datapoint sd
        JOIN scalar_parameter sp ON sp.id = sd.parameter_id
        WHERE sd.entry_id IN (${placeholders})`,
@@ -110,7 +111,7 @@ export async function queryRichEntries(filters: EntryQueryFilters): Promise<Rich
   const scalarsByEntry = new Map<string, RichEntryScalar[]>();
   for (const r of scalarRows) {
     const list = scalarsByEntry.get(r.entry_id) ?? [];
-    list.push({ parameterId: r.parameter_id, paramName: r.param_name, value: r.value });
+    list.push({ parameterId: r.parameter_id, paramName: r.param_name, value: r.value, unit: r.unit });
     scalarsByEntry.set(r.entry_id, list);
   }
 
@@ -123,8 +124,59 @@ export async function queryRichEntries(filters: EntryQueryFilters): Promise<Rich
 
   return entries.map((e) => ({
     id: e.id,
+    formId: e.formId,
     loggedAt: e.loggedAt,
     scalars: scalarsByEntry.get(e.id) ?? [],
     named: namedByEntry.get(e.id) ?? [],
+  }));
+}
+
+// ── Param usage counts ────────────────────────────────────────────────────────
+
+export async function queryParamUsageCounts(): Promise<Record<string, number>> {
+  const db = getSkillDb();
+  const [scalarRows, namedRows] = await Promise.all([
+    db.getAllAsync<{ parameter_id: string; count: number }>(
+      'SELECT parameter_id, COUNT(*) AS count FROM scalar_datapoint GROUP BY parameter_id',
+    ),
+    db.getAllAsync<{ parameter_id: string; count: number }>(
+      'SELECT parameter_id, COUNT(*) AS count FROM named_datapoint GROUP BY parameter_id',
+    ),
+  ]);
+  const result: Record<string, number> = {};
+  for (const r of [...scalarRows, ...namedRows]) {
+    result[r.parameter_id] = (result[r.parameter_id] ?? 0) + r.count;
+  }
+  return result;
+}
+
+// ── Option usage counts ───────────────────────────────────────────────────────
+
+export async function queryOptionUsageCounts(): Promise<Record<string, number>> {
+  const rows = await getSkillDb().getAllAsync<{ option_id: string; count: number }>(
+    'SELECT option_id, COUNT(*) AS count FROM named_datapoint GROUP BY option_id',
+  );
+  const result: Record<string, number> = {};
+  for (const r of rows) result[r.option_id] = r.count;
+  return result;
+}
+
+// ── Option recency ────────────────────────────────────────────────────────────
+
+type RecentOptionRow = { parameter_id: string; option_id: string; session_id: string };
+
+export async function queryRecentNamedOptions(): Promise<
+  { parameterId: string; optionId: string; sessionId: string }[]
+> {
+  const rows = await getSkillDb().getAllAsync<RecentOptionRow>(
+    `SELECT nd.parameter_id, nd.option_id, e.session_id
+     FROM named_datapoint nd
+     JOIN entry e ON e.id = nd.entry_id
+     ORDER BY e.logged_at DESC`,
+  );
+  return rows.map((r) => ({
+    parameterId: r.parameter_id,
+    optionId: r.option_id,
+    sessionId: r.session_id,
   }));
 }

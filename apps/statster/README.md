@@ -8,9 +8,9 @@ The two deliberately separate concerns:
 
 **Data collection** — the priority. An entry is just a set of parameter values. The schema is intentionally slim and generic. The EntryForm is the heart of the app; most engineering effort goes here because frictionless input is the whole point.
 
-**Analysis** — built on top, kept separate. XP, levels, and correlations are derived from the raw data. The exact shape of this layer is intentionally deferred until there's enough real data to know what's actually useful. What exists now (xp.ts, quality parameter type) is placeholder scaffolding.
+**Analysis** — built on top, kept separate. Correlations and aggregates are derived from the raw data. The exact shape of this layer is intentionally deferred until there's enough real data to know what's actually useful.
 
-Entries contribute to levels based on which parameters they contain — a forehand-only entry counts toward your forehand level, a detailed entry with angle/release/distance counts toward all of those. Correlation views (e.g. your anhyzer level vs your pull tendency) are the long-term analytical payoff.
+Correlation views (e.g. your anhyzer results vs your pull tendency) are the long-term analytical payoff. The HomeScreen shows entry counts; StatDetail shows per-param histograms and option occurrence bars, all filterable.
 
 The skill/workspace concept makes the whole thing generic — disc golf, guitar, anything you'd want to gamify.
 
@@ -27,8 +27,8 @@ The top-level container, modelled after Slack workspaces. Each skill has a name,
 The building blocks of data collection. Parameters belong to a skill and form a shared pool that any form in that skill can reference.
 
 There are **2 DB-level types** (separate tables):
-- **scalar_parameter** — a numeric value with min, max, step, unit, and optional labels. If `target` is set, it is used by the analysis layer for quality scoring. In TypeScript this surfaces as either `scalar` (no target) or `quality` (target set).
-- **named_parameter** — a pick-list. Has child `named_option` rows, each with a label and sort order. Options can be soft-deleted (archived) without losing historical data.
+- **scalar_parameter** — a numeric value with min, max, step, unit, optional labels, and an optional `target` (stored for reference but not used in computation). Always surfaces as type `scalar` in TypeScript.
+- **named_parameter** — a pick-list. Has child `named_option` rows, each with a label and sort order. Options can be archived (soft-deleted) without losing historical data; archived options are excluded from the form input but visible in `ParamEditorScreen` where they can be restored or permanently deleted.
 
 There is also a **form-level UI construct** (not a parameter type):
 - **grid2d** — two scalar parameters combined into a single 2D input in a form layout. Stored as two regular `scalar_datapoint` rows on submission. Defined per-form in `form_grid2d`, not in the parameter tables.
@@ -39,7 +39,7 @@ Named layout templates within a skill. A form is an ordered list of parameters (
 
 ### Sessions
 
-A practice session groups entries together. Created lazily on the first logged entry — navigating to `SessionFormScreen` and leaving without logging anything leaves no orphan session rows. Sessions can be named, and can be shared as a `.statster` JSON export.
+A practice session groups entries together. Created lazily on the first logged entry. Sessions can be named, and can be shared as a `.statster` JSON export.
 
 ### Entries
 
@@ -67,16 +67,24 @@ Home
 ├── "Overall" card             → StatDetail (no filters)
 ├── Tracked level card         → StatDetail (pre-loaded with saved level's filters)
 ├── "Manage" button            → SavedLevels
-├── Session row                → Session
-└── "+ New session" button     → SessionForm (new session created immediately)
+├── Gear icon                  → Forms (param & form management)
+├── Session row                → UnifiedSession
+└── "+ New session" button     → UnifiedSession (new session)
 
-Session
-└── "Continue session" button  → SessionForm (resumes existing session)
+UnifiedSession
+├── "+" pill in form selector  → FormEditor (new form, auto-selected on return)
+├── Entry card (tap)           → inline edit card (tap title area to re-collapse)
+└── Add param sheet            → one-off param for current entry only
 
 StatDetail
 └── Filter chips               → refine the level/XP calculation in place
 
-SessionForm                    ← wraps EntryForm, handles DB writes on each log
+Forms
+├── Form row                   → FormEditor
+└── Param row (scalar/named)   → ParamEditor
+
+FormEditor                     ← layout editor: reorder, sticky toggle, add/remove params
+ParamEditor                    ← create/edit scalar or named param; archive option
 ```
 
 ---
@@ -108,6 +116,14 @@ The core of the app. Loaded by `SessionFormScreen`. Has two top-level modes:
 | `components/inputs/PillPicker.tsx` | Option pill selector for named params. |
 | `components/inputs/Grid2DInput.tsx` | 2D grid input for grid2d params (two scalar axes). |
 
+### Session components (`src/components/session/`)
+
+| File | Responsibility |
+|------|---------------|
+| `EntryCard.tsx` | Collapsed entry row in the feed. Shows `#N`, form name, time, and a chip summary (named option labels + scalar abbreviations with unit). `FeedEntry` carries `parameterId`/`optionId` on scalars/named fields so edit mode can reconstruct values without a DB query. |
+| `FittingPills.tsx` | Pill row that measures all pill widths in an invisible pass, shows as many as fit, and puts overflow into a bottom sheet. A "+" pill always appears at the end for adding a new item (form or named option). |
+| `ParamRow.tsx` | Accordion row for a single form parameter in draft/edit mode. Collapsed: shows name + current value. Expanded: `ScalarInput` for scalar params, `FittingPills` for named params with an add-option trigger. |
+
 ### SkillSwitcher (`src/components/SkillSwitcher/`)
 
 | File | Responsibility |
@@ -128,13 +144,15 @@ The core of the app. Loaded by `SessionFormScreen`. Has two top-level modes:
 
 ## Screens
 
-| File | What it shows | Key behaviour |
-|------|--------------|---------------|
-| `HomeScreen.tsx` | Overall level, top 4 tracked levels, recent sessions | Reloads on focus; opens SkillSwitcherSheet inline |
-| `StatDetailScreen.tsx` | Parameter overview + level summary for a filter set | Single `queryRichEntries` call drives all cards; named cards show top-2 options with occurrence bars (expandable accordion); scalar cards show a histogram with a two-handle range slider (handles roam freely, range = min–max of their positions); filtered params are removed from the card list and shown as dismissible chips in the summary card instead |
-| `SavedLevelsScreen.tsx` | All saved levels, reorderable | Top 4 appear on home screen |
-| `SessionScreen.tsx` | All entries in a session with XP per entry | Shows raw form_id as label (known issue); share exports `.statster` JSON |
-| `SessionFormScreen.tsx` | EntryForm wrapper | Creates a session lazily on first log, or continues an existing one; writes entry + datapoints to DB on each log |
+| File                      | What it shows | Key behaviour |
+|---------------------------|--------------|---------------|
+| `HomeScreen.tsx`          | Overall entry count, top 4 tracked filters with counts, recent sessions | Reloads on focus; opens SkillSwitcherSheet inline; gear icon navigates to Forms |
+| `StatDetailScreen.tsx`    | Parameter overview + entry count for a filter set | `queryRichEntries` drives all cards; named cards show top-2 options with occurrence bars (expandable accordion); scalar cards show a histogram with a two-handle range slider; filtered params shown as dismissible chips |
+| `SavedLevelsScreen.tsx`   | All saved levels, reorderable | Top 4 appear on home screen |
+| `UnifiedSessionScreen.tsx` | Session feed + entry logging in a single unified list | Single ScrollView: collapsed `EntryCard` rows oldest-first, expanded edit card in-place, draft card at bottom; form pill strip with "+" to create a new form (auto-selected on return); named option pills ordered by recency (session-first); creates session lazily on first log; tapping a collapsed entry expands it for editing; tapping the title area of an expanded edit card re-closes it; Delete button with confirmation instead of ×; new named options auto-select after creation. State managed by `useEntryDraft(forms, dbRecentOptions)` hook (two instances: draft + edit): each instance owns its entire card state — values bag, form pill order (`formOrder`), option pill order (`localOptionOrders` merged over `dbRecentOptions`), expanded param, and one-offs. `selectOption` sets value + bubbles option to top + advances expanded; `switchForm` clears bag + updates pill order; `loadEntry` (stable) batch-initialises edit state from an existing entry; `initForm` (stable) sets the initial form from `loadForms` without touching the values bag. Neither instance shares ordering state with the other. |
+| `SettingsScreen.tsx`      | All forms + scalar/named param library | New form navigates to FormEditor without DB write (lazy save); archive icon on form rows; archived forms section (collapsed); archived params section (collapsed); param entry counts |
+| `FormEditorScreen.tsx`    | Layout editor for a single form | PanResponder drag-and-drop reordering; sticky toggle; add from library or create new via ParamEditorScreen; lazy save for new forms — DB write deferred to Save button; `isNew` route param hides archive button |
+| `ParamEditorScreen.tsx`   | Create/edit scalar or named param | Reads `initialName` from route params for pre-filled name on new params; Scalar: min/max/step/unit/labels/target; Named: options with archive icon + archived options section with restore; archive button in header for existing params |
 
 ---
 
@@ -149,14 +167,13 @@ Two SQLite databases, both in WAL mode:
 | `schema.ts` | All `CREATE TABLE` / `CREATE INDEX` statements for the skill DB. Source of truth for the schema. |
 | `skillDb.ts` | Singleton connection manager. `openSkillDb(file)` closes the previous DB and opens the new one. `getSkillDb()` returns the current connection (throws if none open). |
 | `meta.ts` | `getAllSkills`, `insertSkill`, `getActiveSkillId`, `setActiveSkillId` — operates on meta.db directly (lazy-opens it). |
-| `parameters.ts` | CRUD for `scalar_parameter`, `named_parameter`, `named_option`. Options support soft-delete via `archiveNamedOption`. |
-| `forms.ts` | CRUD for `form`, `form_param`, `form_grid2d`. `saveFormLayout` replaces a form's entire layout atomically in a transaction. |
+| `parameters.ts` | CRUD for `scalar_parameter`, `named_parameter`, `named_option`. Archive/restore/delete for scalar and named params. Options support soft-delete via `archiveNamedOption`; restored by re-upserting (ON CONFLICT clears `archived_at`). |
+| `forms.ts` | CRUD for `form`, `form_param`, `form_grid2d`. `saveFormLayout` replaces a form's entire layout atomically. Archive/restore/delete for forms. |
 | `entries.ts` | `createEntry`, `getEntriesForSession`, `deleteEntry`. |
-| `datapoints.ts` | `insertDatapoints` (bulk, transactional), `getDatapointsForEntry`. |
-| `sessions.ts` | `startSession`, `finishSession`, `renameSession`, `getSessions`, `getSession`, `getSessionsWithEntryCounts`. |
+| `datapoints.ts` | `insertDatapoints` (bulk, transactional), `getDatapointsForEntry`, `deleteDatapointsForEntry` (deletes all scalar+named datapoints for an entry, used before re-inserting on edit). |
+| `sessions.ts` | `startSession`, `renameSession`, `getSession`, `getSessionsWithEntryCounts`. |
 | `savedLevels.ts` | CRUD + `reorderSavedLevels` for saved level filter presets. |
-| `queries.ts` | `queryEntries(filters)` — dynamic JOIN query returning entries matching any filter combination. `queryRichEntries(filters)` — same but LEFT JOINs all datapoints and returns `RichEntry[]` for the stats view. |
-| `xp.ts` | XP computation and level curves. Never stores XP — always computed on demand. `BASE_XP = 40` per entry; multiplied by quality weights when quality params are present. `levelThreshold(n) = n*(n+1)/2 * 500`. |
+| `queries.ts` | `queryEntries(filters)` — dynamic JOIN query. `queryRichEntries(filters)` — same with full datapoints for stats view; includes `unit` on scalar rows. `queryRecentNamedOptions()` — recency order for UnifiedSession option pills. `queryParamUsageCounts()` — entry counts per param for FormsScreen. `queryOptionUsageCounts()` — entry counts per named option for ParamEditorScreen. |
 | `mappers.ts` | Bridge between DB types and EntryForm types. `loadFormDefinitions` assembles the full form tree (params + grid2ds, ordered). `saveFormDefinitionToDb` persists a FormDefinition. `formValuesToDatapoints` converts form values to scalar/named datapoint inputs. |
 | `types.ts` | TypeScript types for all DB entities (`ScalarParameter`, `NamedParameter`, `Form`, `Entry`, `Session`, etc.). |
 | `seed.ts` | Demo disc golf data. Wipes and re-seeds the skill DB when `SEED_VERSION` is bumped. |

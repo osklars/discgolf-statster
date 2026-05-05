@@ -35,24 +35,6 @@ export async function renameSession(sessionId: string, name: string): Promise<vo
   await getSkillDb().runAsync('UPDATE session SET name = ? WHERE id = ?', [name.trim() || null, sessionId]);
 }
 
-export async function finishSession(sessionId: string, notes?: string): Promise<Session> {
-  const db = getSkillDb();
-  await db.runAsync(
-    `UPDATE session SET finished_at = ?, notes = COALESCE(?, notes) WHERE id = ?`,
-    [now(), notes ?? null, sessionId],
-  );
-  const row = await db.getFirstAsync<SessionRow>('SELECT * FROM session WHERE id = ?', [sessionId]);
-  if (!row) throw new Error(`Session not found: ${sessionId}`);
-  return toSession(row);
-}
-
-export async function getSessions(): Promise<Session[]> {
-  const rows = await getSkillDb().getAllAsync<SessionRow>(
-    'SELECT * FROM session ORDER BY started_at DESC',
-  );
-  return rows.map(toSession);
-}
-
 export async function getSession(id: string): Promise<Session | null> {
   const row = await getSkillDb().getFirstAsync<SessionRow>(
     'SELECT * FROM session WHERE id = ?', [id],

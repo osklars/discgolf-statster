@@ -17,90 +17,43 @@ import type { SessionSummary } from '../db/types';
 import { getSessionsWithEntryCounts } from '../db/sessions';
 import { getSavedLevels } from '../db/savedLevels';
 import type { SavedLevel } from '../db/savedLevels';
-import { getLevelSummary } from '../db/xp';
-import type { LevelSummary, QualityAverage } from '../db/xp';
+import { queryEntries } from '../db/queries';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
-type TrackedItem = SavedLevel & LevelSummary;
-
-function formatQuality(q: QualityAverage): string {
-  if (q.target === q.max || q.target === q.min) {
-    return `${q.avgValue.toFixed(1)} / ${q.target}`;
-  }
-  const sign = q.avgValue >= 0 ? '+' : '';
-  return `${sign}${q.avgValue.toFixed(1)}`;
-}
+type TrackedItem = SavedLevel & { entryCount: number };
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-SE', { month: 'short', day: 'numeric' });
 }
 
-function ProgressBar({ progress, height = 4 }: { progress: number; height?: number }) {
-  const clamped = Math.min(1, Math.max(0, progress));
-  return (
-    <View style={[bar.track, { height }]}>
-      <View style={[bar.fill, { flex: clamped }]} />
-      <View style={{ flex: 1 - clamped }} />
-    </View>
-  );
-}
-
-const bar = StyleSheet.create({
-  track: {
-    flexDirection: 'row',
-    borderRadius: 2,
-    backgroundColor: Colors.separator,
-    overflow: 'hidden',
-  },
-  fill: { backgroundColor: Colors.primary, borderRadius: 2 },
-});
-
-function QualityRow({ averages }: { averages: QualityAverage[] }) {
-  if (averages.length === 0) return null;
-  return (
-    <View style={q.row}>
-      {averages.map((qa) => (
-        <View key={qa.paramId} style={q.item}>
-          <Text style={q.label}>{qa.name}</Text>
-          <Text style={q.value}>{formatQuality(qa)}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-const q = StyleSheet.create({
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
-  item: { gap: 1 },
-  label: { ...Typography.labelSm, color: Colors.textMuted, fontSize: 10 },
-  value: { ...Typography.labelSm, color: Colors.text, fontWeight: '600' },
-});
 
 export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { activeSkill } = useSkill();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
-  const [overall, setOverall] = useState<LevelSummary | null>(null);
+  const [overallCount, setOverallCount] = useState<number | null>(null);
   const [tracked, setTracked] = useState<TrackedItem[]>([]);
 
   const loadData = useCallback(async () => {
-    const [overallSummary, savedLevels, sessionList] = await Promise.all([
-      getLevelSummary([]),
+    const [allEntries, savedLevels, sessionList] = await Promise.all([
+      queryEntries({}),
       getSavedLevels(),
       getSessionsWithEntryCounts(),
     ]);
 
     const top4 = savedLevels.slice(0, 4);
-    const summaries = await Promise.all(
+    const counts = await Promise.all(
       top4.map((sl) =>
-        getLevelSummary(sl.filters.map((f) => ({ parameterId: f.parameterId, optionId: f.optionId }))),
+        queryEntries({
+          namedFilters: sl.filters.map((f) => ({ parameterId: f.parameterId, optionIds: [f.optionId] })),
+        }).then((entries) => entries.length),
       ),
     );
 
-    setOverall(overallSummary);
-    setTracked(top4.map((sl, i) => ({ ...sl, ...summaries[i] })));
+    setOverallCount(allEntries.length);
+    setTracked(top4.map((sl, i) => ({ ...sl, entryCount: counts[i] })));
     setSessions(sessionList);
   }, []);
 
@@ -124,6 +77,9 @@ export function HomeScreen({ navigation }: Props) {
           <Text style={[styles.appTitle, { color: activeSkill.color }]}>{activeSkill.name}</Text>
           <Feather name="chevron-down" size={18} color={activeSkill.color} style={styles.chevron} />
         </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Forms')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Feather name="settings" size={20} color={Colors.textMuted} />
+        </TouchableOpacity>
       </View>
 
       <SkillSwitcherSheet
@@ -137,27 +93,17 @@ export function HomeScreen({ navigation }: Props) {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Overall level — always shown */}
+        {/* Overall — always shown */}
         <TouchableOpacity
           activeOpacity={0.75}
           style={styles.overallCard}
           onPress={() => navigation.navigate('StatDetail', { filters: [] })}
         >
-          <Text style={styles.sectionLabel}>OVERALL LEVEL</Text>
-          {overall && (
-            <>
-              <View style={styles.overallLevelRow}>
-                <Text style={styles.overallLevelNumber}>{overall.level}</Text>
-                <View style={styles.overallMeta}>
-                  <ProgressBar progress={overall.progress} />
-                  <Text style={styles.levelSubtext}>
-                    {Math.round(overall.progress * 100)}% to level {overall.level + 1}
-                  </Text>
-                </View>
-              </View>
-              <QualityRow averages={overall.qualityAverages} />
-            </>
-          )}
+          <Text style={styles.sectionLabel}>OVERALL</Text>
+          <Text style={styles.overallCount}>
+            {overallCount !== null ? overallCount : '—'}
+          </Text>
+          <Text style={styles.levelSubtext}>total entries</Text>
         </TouchableOpacity>
 
         {/* Tracked levels */}
@@ -187,9 +133,8 @@ export function HomeScreen({ navigation }: Props) {
                   onPress={() => navigation.navigate('StatDetail', { filters: item.filters })}
                 >
                   <Text style={styles.trackedName}>{item.name}</Text>
-                  <Text style={styles.trackedLevel}>{item.level}</Text>
-                  <ProgressBar progress={item.progress} />
-                  <QualityRow averages={item.qualityAverages} />
+                  <Text style={styles.trackedLevel}>{item.entryCount}</Text>
+                  <Text style={styles.levelSubtext}>entries</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -208,7 +153,7 @@ export function HomeScreen({ navigation }: Props) {
             key={session.id}
             activeOpacity={0.7}
             style={styles.sessionCard}
-            onPress={() => navigation.navigate('Session', { sessionId: session.id })}
+            onPress={() => navigation.navigate('UnifiedSession', { sessionId: session.id })}
           >
             <View style={styles.sessionCardLeft}>
               <Text style={styles.sessionCourse}>{session.name ?? 'Session'}</Text>
@@ -226,7 +171,7 @@ export function HomeScreen({ navigation }: Props) {
         <TouchableOpacity
           style={styles.newSessionBtn}
           activeOpacity={0.8}
-          onPress={() => navigation.navigate('SessionForm')}
+          onPress={() => navigation.navigate('UnifiedSession')}
         >
           <Text style={styles.newSessionText}>+ New session</Text>
         </TouchableOpacity>
@@ -238,6 +183,9 @@ export function HomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderBottomWidth: hairline,
@@ -272,18 +220,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
-  overallLevelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.lg,
-  },
-  overallLevelNumber: {
+  overallCount: {
     fontSize: 52,
     fontWeight: '700',
     color: Colors.primary,
     lineHeight: 56,
   },
-  overallMeta: { flex: 1, gap: Spacing.xs },
   levelSubtext: { ...Typography.labelSm, color: Colors.textMuted },
   // Tracked card
   trackedCard: {

@@ -29,23 +29,7 @@ export type Grid2DParam = {
   clearAfterSubmit?: boolean;
 };
 
-// Quality: scalar with an ideal target value — used for XP and proficiency scoring.
-export type QualityParam = {
-  id: string;
-  name: string;
-  type: 'quality';
-  min: number;
-  max: number;
-  step: number;
-  majorStep: number;
-  unit?: string;
-  lblMin: string;
-  lblMax: string;
-  target: number;
-  clearAfterSubmit?: boolean;
-};
-
-export type Param = ScalarParam | NamedParam | Grid2DParam | QualityParam;
+export type Param = ScalarParam | NamedParam | Grid2DParam;
 
 // always a string: scalar → "85", named/disc → optionId, grid2d → "85·3"
 export type ParamValue = string;
