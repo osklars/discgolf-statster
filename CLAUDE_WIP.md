@@ -17,6 +17,6 @@ Agreed renames from terminology discussion:
 
 - [ ] UI strings — all screen titles, labels, button text, empty states, alerts
 - [ ] Code identifiers — component names, variable names, function names, type names where they surface in readable code (e.g. `FormDef`, `FormEditorScreen`, `useEntryDraft.formId`, `switchForm`)
-- [ ] DB column/table names — rename fully; app is pre-release so no migration needed; JSON export/import is the data continuity story going forward
+- [ ] DB column/table names — deferred to a separate task; keep snake_case DB names as-is for now, rename only at the TypeScript boundary
 - [ ] README + CLAUDE_WIP/TODO — update all references once code is done
 - [ ] `seed.ts` — exercise/stat names in the disc golf demo data
