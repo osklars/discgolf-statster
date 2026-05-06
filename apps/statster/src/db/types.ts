@@ -1,4 +1,4 @@
-export type ScalarParameter = {
+export type NumberStat = {
   id: string;
   name: string;
   min: number;
@@ -12,38 +12,38 @@ export type ScalarParameter = {
   createdAt: string;
 };
 
-export type NamedParameter = {
+export type ChoiceStat = {
   id: string;
   name: string;
   createdAt: string;
 };
 
-export type NamedOption = {
+export type ChoiceOption = {
   id: string;
-  parameterId: string;
+  statId: string;
   label: string;
   sortOrder: number;
   archivedAt: string | null;
 };
 
-export type Form = {
+export type Exercise = {
   id: string;
   name: string;
   sortOrder: number;
   createdAt: string;
 };
 
-export type FormParam = {
-  formId: string;
-  paramId: string;
-  paramType: 'scalar' | 'named';
+export type ExerciseStatSlot = {
+  exerciseId: string;
+  statId: string;
+  statType: 'scalar' | 'named';
   sortOrder: number;
   clearAfterSubmit: boolean;
 };
 
-export type FormGrid2D = {
+export type ExerciseGrid2D = {
   id: string;
-  formId: string;
+  exerciseId: string;
   name: string;
   axisXId: string;
   axisYId: string;
@@ -69,43 +69,43 @@ export type SessionSummary = {
 export type Entry = {
   id: string;
   sessionId: string;
-  formId: string;
+  exerciseId: string;
   entryNumber: number;
   loggedAt: string;
 };
 
-export type ScalarDatapoint = {
+export type NumberDatapoint = {
   id: string;
   entryId: string;
-  parameterId: string;
+  statId: string;
   value: number;
 };
 
-export type NamedDatapoint = {
+export type ChoiceDatapoint = {
   id: string;
   entryId: string;
-  parameterId: string;
+  statId: string;
   optionId: string;
 };
 
 export type DatapointsForEntry = {
-  scalars: ScalarDatapoint[];
-  named: NamedDatapoint[];
+  scalars: NumberDatapoint[];
+  named: ChoiceDatapoint[];
 };
 
-export type ScalarFilter = {
-  parameterId: string;
+export type NumberFilter = {
+  statId: string;
   min?: number;
   max?: number;
 };
 
-export type NamedFilter = {
-  parameterId: string;
+export type ChoiceFilter = {
+  statId: string;
   optionIds: string[];
 };
 
 export type EntryQueryFilters = {
-  scalarFilters?: ScalarFilter[];
-  namedFilters?: NamedFilter[];
+  numberFilters?: NumberFilter[];
+  choiceFilters?: ChoiceFilter[];
   sessionId?: string;
 };

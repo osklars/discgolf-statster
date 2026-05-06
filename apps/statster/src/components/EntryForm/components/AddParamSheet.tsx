@@ -1,12 +1,12 @@
 import React from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Colors, MIN_HIT, Spacing, Typography, hairline } from '../../../constants/theme';
-import type { NamedParam, ScalarParam } from '../types';
+import type { ChoiceStatDef, NumberStatDef } from '../types';
 
 interface Props {
   visible: boolean;
-  available: (ScalarParam | NamedParam)[];
-  onAdd: (param: ScalarParam | NamedParam) => void;
+  available: (NumberStatDef | ChoiceStatDef)[];
+  onAdd: (stat: NumberStatDef | ChoiceStatDef) => void;
   onCreateNew: () => void;
   onClose: () => void;
 }
@@ -26,7 +26,7 @@ export function AddParamSheet({ visible, available, onAdd, onCreateNew, onClose 
     >
       <View style={styles.sheet}>
         <View style={styles.header}>
-          <Text style={styles.title}>Add Param</Text>
+          <Text style={styles.title}>Add Stat</Text>
           <TouchableOpacity onPress={onClose} style={styles.cancelBtn} activeOpacity={0.7}>
             <Text style={styles.cancelText}>Cancel</Text>
           </TouchableOpacity>

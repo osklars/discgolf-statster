@@ -2,10 +2,10 @@ import React, { useCallback, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
 import { Circle, Line, Svg, Text as SvgText } from 'react-native-svg';
 import { Colors, Typography } from '../../../../constants/theme';
-import type { Grid2DParam } from '../../types';
+import type { Grid2DStatDef } from '../../types';
 
 interface Props {
-  param: Grid2DParam;
+  param: Grid2DStatDef;
   valueX: number | undefined;
   valueY: number | undefined;
   onDragStart: () => void;

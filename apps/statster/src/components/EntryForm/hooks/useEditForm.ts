@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { FormDefinition, Grid2DParam, Param, ScalarParam } from '../types';
+import type { ExerciseDef, Grid2DStatDef, StatDef, NumberStatDef } from '../types';
 
 function uid(): string {
   return `p_${Math.random().toString(36).slice(2, 9)}`;
@@ -7,9 +7,9 @@ function uid(): string {
 
 export type CombinePending = { sourceId: string } | null;
 
-export function useEditForm(initial: FormDefinition) {
-  const [draft, setDraft] = useState<Param[]>(initial.params);
-  const [settingsTarget, setSettingsTarget] = useState<Param | 'new' | null>(null);
+export function useEditForm(initial: ExerciseDef) {
+  const [draft, setDraft] = useState<StatDef[]>(initial.params);
+  const [settingsTarget, setSettingsTarget] = useState<StatDef | 'new' | null>(null);
   const [combinePending, setCombinePending] = useState<CombinePending>(null);
 
   const moveUp = useCallback((id: string) => {
@@ -37,12 +37,12 @@ export function useEditForm(initial: FormDefinition) {
     setCombinePending((prev) => (prev?.sourceId === id ? null : prev));
   }, []);
 
-  const saveParam = useCallback((param: Param) => {
+  const saveParam = useCallback((stat: StatDef) => {
     setDraft((prev) => {
-      const idx = prev.findIndex((p) => p.id === param.id);
-      if (idx === -1) return [...prev, param];
+      const idx = prev.findIndex((p) => p.id === stat.id);
+      if (idx === -1) return [...prev, stat];
       const next = [...prev];
-      next[idx] = param;
+      next[idx] = stat;
       return next;
     });
     setSettingsTarget(null);
@@ -59,9 +59,9 @@ export function useEditForm(initial: FormDefinition) {
       const src = prev.find((p) => p.id === sourceId);
       const tgt = prev.find((p) => p.id === targetId);
       if (!src || !tgt || src.type !== 'scalar' || tgt.type !== 'scalar') return prev;
-      const axisX = (sourceAsX ? src : tgt) as ScalarParam;
-      const axisY = (sourceAsX ? tgt : src) as ScalarParam;
-      const grid: Grid2DParam = {
+      const axisX = (sourceAsX ? src : tgt) as NumberStatDef;
+      const axisY = (sourceAsX ? tgt : src) as NumberStatDef;
+      const grid: Grid2DStatDef = {
         id: uid(),
         name: `${axisX.name} × ${axisY.name}`,
         type: 'grid2d',
@@ -89,9 +89,9 @@ export function useEditForm(initial: FormDefinition) {
     });
   }, []);
 
-  const openSettings = useCallback((param: Param) => {
+  const openSettings = useCallback((stat: StatDef) => {
     setCombinePending(null);
-    setSettingsTarget(param);
+    setSettingsTarget(stat);
   }, []);
 
   const openAddNew = useCallback(() => {
@@ -123,7 +123,7 @@ export function useEditForm(initial: FormDefinition) {
     });
   }, []);
 
-  const newParamTemplate = (): ScalarParam => ({
+  const newParamTemplate = (): NumberStatDef => ({
     id: uid(),
     name: '',
     type: 'scalar',

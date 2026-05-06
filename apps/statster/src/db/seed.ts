@@ -1,7 +1,7 @@
-import { upsertNamedOption, upsertNamedParameter, upsertScalarParameter } from './parameters';
-import { upsertForm, saveFormLayout } from './forms';
-import { getSkillDb } from './skillDb';
-import { SKILL_DB_SCHEMA } from './schema';
+import { upsertChoiceOption, upsertChoiceStat, upsertNumberStat } from './parameters';
+import { upsertExercise, saveExerciseLayout } from './forms';
+import { getInterestDb } from './interestDb';
+import { INTEREST_DB_SCHEMA } from './schema';
 
 // Bump this any time you want the app to wipe and re-seed on next launch.
 const SEED_VERSION = 5;
@@ -21,7 +21,7 @@ const WIPE_DATA_SQL = `
 `;
 
 export async function seedIfEmpty(): Promise<void> {
-  const db = getSkillDb();
+  const db = getInterestDb();
 
   let storedVersion = 0;
   try {
@@ -36,7 +36,7 @@ export async function seedIfEmpty(): Promise<void> {
   if (storedVersion === SEED_VERSION) return;
 
   await db.execAsync(WIPE_DATA_SQL);
-  await db.execAsync(SKILL_DB_SCHEMA);
+  await db.execAsync(INTEREST_DB_SCHEMA);
   await seedDiscGolf();
   await db.runAsync(
     "INSERT OR REPLACE INTO seed_meta (key, value) VALUES ('seed_version', ?)",
@@ -46,23 +46,23 @@ export async function seedIfEmpty(): Promise<void> {
 
 // ── Layout entry helpers ──────────────────────────────────────────────────────
 
-type NE = { type: 'named'; paramId: string; sortOrder: number; clearAfterSubmit?: boolean };
-type SE = { type: 'scalar'; paramId: string; sortOrder: number; clearAfterSubmit?: boolean };
+type NE = { type: 'named'; statId: string; sortOrder: number; clearAfterSubmit?: boolean };
+type SE = { type: 'scalar'; statId: string; sortOrder: number; clearAfterSubmit?: boolean };
 type LayoutRow = NE | SE;
 
-function n(paramId: string, sortOrder: number, clearAfterSubmit = true): NE {
-  return { type: 'named', paramId, sortOrder, clearAfterSubmit };
+function n(statId: string, sortOrder: number, clearAfterSubmit = true): NE {
+  return { type: 'named', statId, sortOrder, clearAfterSubmit };
 }
-function s(paramId: string, sortOrder: number, clearAfterSubmit = true): SE {
-  return { type: 'scalar', paramId, sortOrder, clearAfterSubmit };
+function s(statId: string, sortOrder: number, clearAfterSubmit = true): SE {
+  return { type: 'scalar', statId, sortOrder, clearAfterSubmit };
 }
 
 // ── Seed ──────────────────────────────────────────────────────────────────────
 
 async function seedDiscGolf(): Promise<void> {
-  // ── Named parameters ────────────────────────────────────────────────────────
+  // ── Choice stats ────────────────────────────────────────────────────────────
 
-  await upsertNamedParameter({ id: 'disc', name: 'Disc' });
+  await upsertChoiceStat({ id: 'disc', name: 'Disc' });
   const discs = [
     { id: 'd_destroyer', label: 'Destroyer' },
     { id: 'd_wraith',    label: 'Wraith'     },
@@ -72,14 +72,14 @@ async function seedDiscGolf(): Promise<void> {
     { id: 'd_aviar',     label: 'Aviar'      },
   ];
   for (let i = 0; i < discs.length; i++) {
-    await upsertNamedOption({ id: discs[i].id, parameterId: 'disc', label: discs[i].label, sortOrder: i });
+    await upsertChoiceOption({ id: discs[i].id, statId: 'disc', label: discs[i].label, sortOrder: i });
   }
 
-  await upsertNamedParameter({ id: 'hand', name: 'Hand' });
-  await upsertNamedOption({ id: 'hand_bh', parameterId: 'hand', label: 'Backhand', sortOrder: 0 });
-  await upsertNamedOption({ id: 'hand_fh', parameterId: 'hand', label: 'Forehand', sortOrder: 1 });
+  await upsertChoiceStat({ id: 'hand', name: 'Hand' });
+  await upsertChoiceOption({ id: 'hand_bh', statId: 'hand', label: 'Backhand', sortOrder: 0 });
+  await upsertChoiceOption({ id: 'hand_fh', statId: 'hand', label: 'Forehand', sortOrder: 1 });
 
-  await upsertNamedParameter({ id: 'shot_shape', name: 'Shot shape' });
+  await upsertChoiceStat({ id: 'shot_shape', name: 'Shot shape' });
   const shapes = [
     { id: 'ss_straight', label: 'Straight'    },
     { id: 'ss_hyzer',    label: 'Hyzer'       },
@@ -91,15 +91,15 @@ async function seedDiscGolf(): Promise<void> {
     { id: 'ss_roller',   label: 'Roller'      },
   ];
   for (let i = 0; i < shapes.length; i++) {
-    await upsertNamedOption({ id: shapes[i].id, parameterId: 'shot_shape', label: shapes[i].label, sortOrder: i });
+    await upsertChoiceOption({ id: shapes[i].id, statId: 'shot_shape', label: shapes[i].label, sortOrder: i });
   }
 
-  await upsertNamedParameter({ id: 'throw_type', name: 'Throw type' });
-  await upsertNamedOption({ id: 'tt_real',     parameterId: 'throw_type', label: 'Real',     sortOrder: 0 });
-  await upsertNamedOption({ id: 'tt_practice', parameterId: 'throw_type', label: 'Practice', sortOrder: 1 });
-  await upsertNamedOption({ id: 'tt_mulligan', parameterId: 'throw_type', label: 'Mulligan', sortOrder: 2 });
+  await upsertChoiceStat({ id: 'throw_type', name: 'Throw type' });
+  await upsertChoiceOption({ id: 'tt_real',     statId: 'throw_type', label: 'Real',     sortOrder: 0 });
+  await upsertChoiceOption({ id: 'tt_practice', statId: 'throw_type', label: 'Practice', sortOrder: 1 });
+  await upsertChoiceOption({ id: 'tt_mulligan', statId: 'throw_type', label: 'Mulligan', sortOrder: 2 });
 
-  await upsertNamedParameter({ id: 'putt_shape', name: 'Putt shape' });
+  await upsertChoiceStat({ id: 'putt_shape', name: 'Putt shape' });
   const puttShapes = [
     { id: 'ps_straight', label: 'Straight' },
     { id: 'ps_uphill',   label: 'Uphill'   },
@@ -110,10 +110,10 @@ async function seedDiscGolf(): Promise<void> {
     { id: 'ps_turbo',    label: 'Turbo'    },
   ];
   for (let i = 0; i < puttShapes.length; i++) {
-    await upsertNamedOption({ id: puttShapes[i].id, parameterId: 'putt_shape', label: puttShapes[i].label, sortOrder: i });
+    await upsertChoiceOption({ id: puttShapes[i].id, statId: 'putt_shape', label: puttShapes[i].label, sortOrder: i });
   }
 
-  await upsertNamedParameter({ id: 'putt_stance', name: 'Stance' });
+  await upsertChoiceStat({ id: 'putt_stance', name: 'Stance' });
   const stances = [
     { id: 'st_staggered',       label: 'Staggered'       },
     { id: 'st_straddle',        label: 'Straddle'        },
@@ -124,10 +124,10 @@ async function seedDiscGolf(): Promise<void> {
     { id: 'st_straddle_right',  label: 'Straddle right'  },
   ];
   for (let i = 0; i < stances.length; i++) {
-    await upsertNamedOption({ id: stances[i].id, parameterId: 'putt_stance', label: stances[i].label, sortOrder: i });
+    await upsertChoiceOption({ id: stances[i].id, statId: 'putt_stance', label: stances[i].label, sortOrder: i });
   }
 
-  await upsertNamedParameter({ id: 'putt_result', name: 'Result' });
+  await upsertChoiceStat({ id: 'putt_result', name: 'Result' });
   const puttResults = [
     { id: 'pr_make',        label: 'Make'       },
     { id: 'pr_airball',     label: 'Airball'    },
@@ -138,29 +138,29 @@ async function seedDiscGolf(): Promise<void> {
     { id: 'pr_cut_through', label: 'Cut-through'},
   ];
   for (let i = 0; i < puttResults.length; i++) {
-    await upsertNamedOption({ id: puttResults[i].id, parameterId: 'putt_result', label: puttResults[i].label, sortOrder: i });
+    await upsertChoiceOption({ id: puttResults[i].id, statId: 'putt_result', label: puttResults[i].label, sortOrder: i });
   }
 
-  // ── Scalar parameters ───────────────────────────────────────────────────────
+  // ── Number stats ────────────────────────────────────────────────────────────
 
-  await upsertScalarParameter({ id: 'diff',        name: 'Difficulty',      min: 1,  max: 10,  step: 1,   majorStep: 1,  lblMin: 'easy',  lblMax: 'hard',  unit: null, target: null });
-  await upsertScalarParameter({ id: 'target_dist', name: 'Target distance', min: 0,  max: 160, step: 5,   majorStep: 50, lblMin: '0m',    lblMax: '160m',  unit: 'm',  target: null });
-  await upsertScalarParameter({ id: 'distance',    name: 'Distance',        min: 0,  max: 160, step: 5,   majorStep: 50, lblMin: '0m',    lblMax: '160m',  unit: 'm',  target: null });
-  await upsertScalarParameter({ id: 'putt_dist',   name: 'Distance',        min: 0,  max: 30,  step: 1,   majorStep: 5,  lblMin: '0m',    lblMax: '30m',   unit: 'm',  target: null });
+  await upsertNumberStat({ id: 'diff',        name: 'Difficulty',      min: 1,  max: 10,  step: 1,   majorStep: 1,  lblMin: 'easy',  lblMax: 'hard',  unit: null, target: null });
+  await upsertNumberStat({ id: 'target_dist', name: 'Target distance', min: 0,  max: 160, step: 5,   majorStep: 50, lblMin: '0m',    lblMax: '160m',  unit: 'm',  target: null });
+  await upsertNumberStat({ id: 'distance',    name: 'Distance',        min: 0,  max: 160, step: 5,   majorStep: 50, lblMin: '0m',    lblMax: '160m',  unit: 'm',  target: null });
+  await upsertNumberStat({ id: 'putt_dist',   name: 'Distance',        min: 0,  max: 30,  step: 1,   majorStep: 5,  lblMin: '0m',    lblMax: '30m',   unit: 'm',  target: null });
 
-  // ── Quality parameters (target = ideal value) ───────────────────────────────
+  // ── Quality stats (target = ideal value) ────────────────────────────────────
 
-  await upsertScalarParameter({ id: 'grade',          name: 'Grade',          min: 1,  max: 10, step: 1,   majorStep: 1, lblMin: 'shank',      lblMax: 'pure',      unit: null, target: 10 });
-  await upsertScalarParameter({ id: 'line',           name: 'Line',           min: -2, max: 2,  step: 1,   majorStep: 1, lblMin: 'early',      lblMax: 'pulled',    unit: null, target: 0  });
-  await upsertScalarParameter({ id: 'height',         name: 'Height',         min: -2, max: 2,  step: 1,   majorStep: 1, lblMin: 'too low',    lblMax: 'too high',  unit: null, target: 0  });
-  await upsertScalarParameter({ id: 'release_angle',  name: 'Release angle',  min: -2, max: 2,  step: 1,   majorStep: 1, lblMin: 'hyzer',      lblMax: 'anhyzer',   unit: null, target: 0  });
-  await upsertScalarParameter({ id: 'flip',           name: 'Flip',           min: -2, max: 2,  step: 1,   majorStep: 1, lblMin: 'too stable', lblMax: 'too flippy',unit: null, target: 0  });
-  await upsertScalarParameter({ id: 'miss',           name: 'Miss',           min: -2, max: 2,  step: 0.5, majorStep: 1, lblMin: 'left',       lblMax: 'right',     unit: 'm',  target: 0  });
+  await upsertNumberStat({ id: 'grade',          name: 'Grade',          min: 1,  max: 10, step: 1,   majorStep: 1, lblMin: 'shank',      lblMax: 'pure',      unit: null, target: 10 });
+  await upsertNumberStat({ id: 'line',           name: 'Line',           min: -2, max: 2,  step: 1,   majorStep: 1, lblMin: 'early',      lblMax: 'pulled',    unit: null, target: 0  });
+  await upsertNumberStat({ id: 'height',         name: 'Height',         min: -2, max: 2,  step: 1,   majorStep: 1, lblMin: 'too low',    lblMax: 'too high',  unit: null, target: 0  });
+  await upsertNumberStat({ id: 'release_angle',  name: 'Release angle',  min: -2, max: 2,  step: 1,   majorStep: 1, lblMin: 'hyzer',      lblMax: 'anhyzer',   unit: null, target: 0  });
+  await upsertNumberStat({ id: 'flip',           name: 'Flip',           min: -2, max: 2,  step: 1,   majorStep: 1, lblMin: 'too stable', lblMax: 'too flippy',unit: null, target: 0  });
+  await upsertNumberStat({ id: 'miss',           name: 'Miss',           min: -2, max: 2,  step: 0.5, majorStep: 1, lblMin: 'left',       lblMax: 'right',     unit: 'm',  target: 0  });
 
-  // ── Forms ───────────────────────────────────────────────────────────────────
+  // ── Exercises ────────────────────────────────────────────────────────────────
 
-  await upsertForm({ id: 'throw_detailed', name: 'Throw detailed', sortOrder: 0 });
-  await saveFormLayout('throw_detailed', [
+  await upsertExercise({ id: 'throw_detailed', name: 'Throw detailed', sortOrder: 0 });
+  await saveExerciseLayout('throw_detailed', [
     n('disc',         0,  false),
     n('shot_shape',   1),
     n('hand',         2,  false),
@@ -175,16 +175,16 @@ async function seedDiscGolf(): Promise<void> {
     n('throw_type',   11, false),
   ] satisfies LayoutRow[]);
 
-  await upsertForm({ id: 'throw', name: 'Throw', sortOrder: 1 });
-  await saveFormLayout('throw', [
+  await upsertExercise({ id: 'throw', name: 'Throw', sortOrder: 1 });
+  await saveExerciseLayout('throw', [
     n('disc',       0, false),
     n('shot_shape', 1),
     n('hand',       2, false),
     s('grade',      3),
   ] satisfies LayoutRow[]);
 
-  await upsertForm({ id: 'putt_detailed', name: 'Putt detailed', sortOrder: 2 });
-  await saveFormLayout('putt_detailed', [
+  await upsertExercise({ id: 'putt_detailed', name: 'Putt detailed', sortOrder: 2 });
+  await saveExerciseLayout('putt_detailed', [
     s('putt_dist',   0),
     n('putt_shape',  1),
     n('putt_stance', 2),
@@ -193,15 +193,15 @@ async function seedDiscGolf(): Promise<void> {
     s('miss',        5),
   ] satisfies LayoutRow[]);
 
-  await upsertForm({ id: 'putt', name: 'Putt', sortOrder: 3 });
-  await saveFormLayout('putt', [
+  await upsertExercise({ id: 'putt', name: 'Putt', sortOrder: 3 });
+  await saveExerciseLayout('putt', [
     s('putt_dist', 0),
     s('grade',     1),
   ] satisfies LayoutRow[]);
 
-  // ── Default saved levels ─────────────────────────────────────────────────────
+  // ── Default levels ───────────────────────────────────────────────────────────
 
-  const db = getSkillDb();
+  const db = getInterestDb();
   const now = new Date().toISOString();
   await db.runAsync(
     'INSERT INTO saved_level (id, name, filters, sort_order, created_at) VALUES (?, ?, ?, ?, ?)',

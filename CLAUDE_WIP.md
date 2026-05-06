@@ -15,8 +15,8 @@ Agreed renames from terminology discussion:
 
 ### Scope
 
-- [ ] UI strings — all screen titles, labels, button text, empty states, alerts
-- [ ] Code identifiers — component names, variable names, function names, type names where they surface in readable code (e.g. `FormDef`, `FormEditorScreen`, `useEntryDraft.formId`, `switchForm`)
+- [x] UI strings — all screen titles, labels, button text, empty states, alerts
+- [x] Code identifiers — component names, variable names, function names, type names where they surface in readable code (e.g. `ExerciseDef`, `ExerciseEditorScreen`, `useEntryDraft.exerciseId`, `switchExercise`)
 - [ ] DB column/table names — deferred to a separate task; keep snake_case DB names as-is for now, rename only at the TypeScript boundary
-- [ ] README + CLAUDE_WIP/TODO — update all references once code is done
-- [ ] `seed.ts` — exercise/stat names in the disc golf demo data
+- [x] README + CLAUDE_WIP/TODO — update all references once code is done
+- [x] `seed.ts` — already uses new function names; exercise/stat display names are domain content, not identifier renames

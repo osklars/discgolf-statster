@@ -1,4 +1,4 @@
-export const SKILL_DB_SCHEMA = `
+export const INTEREST_DB_SCHEMA = `
   PRAGMA journal_mode = WAL;
   PRAGMA foreign_keys = ON;
 

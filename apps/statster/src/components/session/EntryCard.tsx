@@ -4,12 +4,12 @@ import { Colors, Radius, Spacing, Typography, hairline } from '../../constants/t
 
 export type FeedEntry = {
   id: string;
-  formId: string;
-  formName: string;
+  exerciseId: string;
+  exerciseName: string;
   entryNumber: number;
   loggedAt: string;
-  scalars: { name: string; parameterId: string; value: number; unit: string | null }[];
-  named: { name: string; parameterId: string; label: string; optionId: string }[];
+  scalars: { name: string; statId: string; value: number; unit: string | null }[];
+  named: { name: string; statId: string; label: string; optionId: string }[];
 };
 
 function formatTime(iso: string): string {
@@ -32,7 +32,7 @@ export function EntryCard({ entry, onPress }: { entry: FeedEntry; onPress: () =>
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.header}>
         <Text style={styles.number}>#{entry.entryNumber}</Text>
-        <Text style={styles.formName} numberOfLines={1}>{entry.formName}</Text>
+        <Text style={styles.exerciseName} numberOfLines={1}>{entry.exerciseName}</Text>
         <Text style={styles.time}>{formatTime(entry.loggedAt)}</Text>
       </View>
       {chips.length > 0 && (
@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   number: { ...Typography.labelSm, color: Colors.textMuted, fontWeight: '600' },
-  formName: { ...Typography.label, color: Colors.text, fontWeight: '600', flex: 1 },
+  exerciseName: { ...Typography.label, color: Colors.text, fontWeight: '600', flex: 1 },
   time: { ...Typography.labelSm, color: Colors.textDisabled },
   summary: { ...Typography.labelSm, color: Colors.textMuted },
 });

@@ -17,29 +17,29 @@ import type { RootStackParamList } from '../navigation/types';
 import { Colors, Radius, Spacing, Typography, hairline } from '../constants/theme';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import {
-  getScalarParameters, getNamedParameters, getNamedOptions,
-  upsertScalarParameter, upsertNamedParameter, upsertNamedOption, archiveNamedOption, deleteNamedOption,
-  archiveScalarParameter, archiveNamedParameter,
+  getNumberStats, getChoiceStats, getChoiceOptions,
+  upsertNumberStat, upsertChoiceStat, upsertChoiceOption, archiveChoiceOption, deleteChoiceOption,
+  archiveNumberStat, archiveChoiceStat,
 } from '../db/parameters';
-import { queryOptionUsageCounts } from '../db/queries';
-import { getFormParams, saveFormLayout } from '../db/forms';
+import { queryChoiceOptionUsageCounts } from '../db/queries';
+import { getExerciseStats, saveExerciseLayout } from '../db/forms';
 import { randomUUID } from 'expo-crypto';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'ParamEditor'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'StatEditor'>;
 
 type OptionEntry = { id: string; label: string; toArchive: boolean; isNew: boolean };
 type OptionCount = Record<string, number>;
 
-export function ParamEditorScreen({ route, navigation }: Props) {
-  const { paramType, paramId, addToFormId, initialName } = route.params;
+export function StatEditorScreen({ route, navigation }: Props) {
+  const { statType, statId, addToExerciseId, initialName } = route.params;
   const insets = useSafeAreaInsets();
-  const isNew = !paramId;
-  const savedParamId = useRef(paramId ?? randomUUID());
+  const isNew = !statId;
+  const savedStatId = useRef(statId ?? randomUUID());
 
   // Shared
   const [name, setName] = useState(initialName ?? '');
 
-  // Scalar fields
+  // Number stat fields
   const [min, setMin] = useState('0');
   const [max, setMax] = useState('100');
   const [step, setStep] = useState('1');
@@ -49,21 +49,21 @@ export function ParamEditorScreen({ route, navigation }: Props) {
   const [lblMax, setLblMax] = useState('');
   const [target, setTarget] = useState('');
 
-  // Named options
+  // Choice options
   const [options, setOptions] = useState<OptionEntry[]>([]);
   const [optionCounts, setOptionCounts] = useState<OptionCount>({});
   const [archivedOptionsExpanded, setArchivedOptionsExpanded] = useState(false);
 
   const handleArchive = useCallback(async () => {
-    if (!paramId) return;
-    if (paramType === 'scalar') await archiveScalarParameter(paramId);
-    else await archiveNamedParameter(paramId);
+    if (!statId) return;
+    if (statType === 'scalar') await archiveNumberStat(statId);
+    else await archiveChoiceStat(statId);
     navigation.goBack();
-  }, [paramId, paramType, navigation]);
+  }, [statId, statType, navigation]);
 
   const handleRename = useCallback(() => {
     Alert.prompt(
-      isNew ? 'Name this parameter' : 'Rename parameter',
+      isNew ? 'Name this stat' : 'Rename stat',
       undefined,
       (input) => {
         if (!input?.trim()) return;
@@ -75,10 +75,10 @@ export function ParamEditorScreen({ route, navigation }: Props) {
   }, [isNew, name]);
 
   useEffect(() => {
-    if (!paramId) return;
-    if (paramType === 'scalar') {
-      getScalarParameters().then((scalars) => {
-        const s = scalars.find((x) => x.id === paramId);
+    if (!statId) return;
+    if (statType === 'scalar') {
+      getNumberStats().then((stats) => {
+        const s = stats.find((x) => x.id === statId);
         if (!s) return;
         setName(s.name);
         setMin(String(s.min));
@@ -91,16 +91,16 @@ export function ParamEditorScreen({ route, navigation }: Props) {
         setTarget(s.target !== null ? String(s.target) : '');
       }).catch(console.error);
     } else {
-      getNamedParameters().then((named) => {
-        const n = named.find((x) => x.id === paramId);
+      getChoiceStats().then((stats) => {
+        const n = stats.find((x) => x.id === statId);
         if (n) setName(n.name);
       }).catch(console.error);
-      Promise.all([getNamedOptions(paramId), queryOptionUsageCounts()]).then(([opts, counts]) => {
+      Promise.all([getChoiceOptions(statId), queryChoiceOptionUsageCounts()]).then(([opts, counts]) => {
         setOptions(opts.map((o) => ({ id: o.id, label: o.label, toArchive: o.archivedAt !== null, isNew: false })));
         setOptionCounts(counts);
       }).catch(console.error);
     }
-  }, [paramId, paramType]);
+  }, [statId, statType]);
 
   const handleSave = useCallback(async () => {
     if (!name.trim()) {
@@ -108,9 +108,9 @@ export function ParamEditorScreen({ route, navigation }: Props) {
       return;
     }
 
-    const id = savedParamId.current;
+    const id = savedStatId.current;
 
-    if (paramType === 'scalar') {
+    if (statType === 'scalar') {
       const minN = parseFloat(min);
       const maxN = parseFloat(max);
       const stepN = parseFloat(step);
@@ -135,7 +135,7 @@ export function ParamEditorScreen({ route, navigation }: Props) {
         return;
       }
 
-      await upsertScalarParameter({
+      await upsertNumberStat({
         id,
         name: name.trim(),
         min: minN, max: maxN, step: stepN, majorStep: majorN,
@@ -145,28 +145,28 @@ export function ParamEditorScreen({ route, navigation }: Props) {
         target: targetN,
       });
     } else {
-      await upsertNamedParameter({ id, name: name.trim() });
+      await upsertChoiceStat({ id, name: name.trim() });
 
       let sortOrder = 0;
       for (const o of options) {
         if (o.toArchive) {
-          if (!o.isNew) await archiveNamedOption(o.id);
+          if (!o.isNew) await archiveChoiceOption(o.id);
           continue;
         }
-        await upsertNamedOption({ id: o.id, parameterId: id, label: o.label, sortOrder: sortOrder++ });
+        await upsertChoiceOption({ id: o.id, statId: id, label: o.label, sortOrder: sortOrder++ });
       }
     }
 
-    if (addToFormId) {
-      const current = await getFormParams(addToFormId);
-      await saveFormLayout(addToFormId, [
-        ...current.map((p) => ({ type: p.paramType, paramId: p.paramId, sortOrder: p.sortOrder, clearAfterSubmit: p.clearAfterSubmit })),
-        { type: paramType, paramId: id, sortOrder: current.length, clearAfterSubmit: true },
+    if (addToExerciseId) {
+      const current = await getExerciseStats(addToExerciseId);
+      await saveExerciseLayout(addToExerciseId, [
+        ...current.map((s) => ({ type: s.statType, statId: s.statId, sortOrder: s.sortOrder, clearAfterSubmit: s.clearAfterSubmit })),
+        { type: statType, statId: id, sortOrder: current.length, clearAfterSubmit: true },
       ]);
     }
 
     navigation.goBack();
-  }, [name, paramType, min, max, step, majorStep, unit, lblMin, lblMax, options, addToFormId, navigation]);
+  }, [name, statType, min, max, step, majorStep, unit, lblMin, lblMax, options, addToExerciseId, navigation]);
 
   const handleAddOption = useCallback(() => {
     Alert.prompt('New option', 'Enter a label', (label) => {
@@ -207,14 +207,14 @@ export function ParamEditorScreen({ route, navigation }: Props) {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          await deleteNamedOption(opt.id);
+          await deleteChoiceOption(opt.id);
           setOptions((prev) => prev.filter((_, i) => i !== idx));
         },
       },
     ]);
   }, [options, optionCounts]);
 
-  const headerTitle = name.trim() || (paramType === 'scalar' ? 'New Scalar' : 'New Named');
+  const headerTitle = name.trim() || (statType === 'scalar' ? 'New Number Stat' : 'New Choice Stat');
 
   return (
     <KeyboardAvoidingView
@@ -233,7 +233,7 @@ export function ParamEditorScreen({ route, navigation }: Props) {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 80 }]}
         keyboardShouldPersistTaps="handled"
       >
-        {paramType === 'scalar' ? (
+        {statType === 'scalar' ? (
           <>
             <View style={styles.row2}>
               <View style={[styles.fieldGroup, styles.flex1]}>
@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.separator,
   },
   row2: { flexDirection: 'row', gap: Spacing.md },
-  // Named options
+  // Choice options
   archivedOptHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   optionsCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden' },
   optRow: {

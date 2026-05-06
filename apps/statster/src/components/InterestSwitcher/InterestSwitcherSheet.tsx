@@ -11,16 +11,16 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Colors, Radius, Spacing, Typography, hairline } from '../../constants/theme';
-import { useSkill, type Skill } from '../../contexts/SkillContext';
+import { useInterest, type Interest } from '../../contexts/InterestContext';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onAddSkill: () => void;
+  onAddInterest: () => void;
 }
 
-export function SkillSwitcherSheet({ visible, onClose, onAddSkill }: Props) {
-  const { skills, activeSkill, switchSkill } = useSkill();
+export function InterestSwitcherSheet({ visible, onClose, onAddInterest }: Props) {
+  const { interests, activeInterest, switchInterest } = useInterest();
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(300)).current;
 
@@ -33,8 +33,8 @@ export function SkillSwitcherSheet({ visible, onClose, onAddSkill }: Props) {
     }).start();
   }, [visible, slideAnim]);
 
-  const handleSelect = async (skill: Skill) => {
-    await switchSkill(skill.id);
+  const handleSelect = async (interest: Interest) => {
+    await switchInterest(interest.id);
     onClose();
   };
 
@@ -50,25 +50,25 @@ export function SkillSwitcherSheet({ visible, onClose, onAddSkill }: Props) {
         ]}
       >
         <View style={styles.handle} />
-        <Text style={styles.sheetTitle}>Switch skill</Text>
+        <Text style={styles.sheetTitle}>Switch interest</Text>
 
-        {skills.map((skill) => {
-          const isActive = skill.id === activeSkill.id;
+        {interests.map((interest) => {
+          const isActive = interest.id === activeInterest.id;
           return (
             <TouchableOpacity
-              key={skill.id}
-              style={styles.skillRow}
-              onPress={() => handleSelect(skill)}
+              key={interest.id}
+              style={styles.interestRow}
+              onPress={() => handleSelect(interest)}
               activeOpacity={0.7}
             >
-              <View style={[styles.skillIcon, { backgroundColor: skill.color + '22' }]}>
-                <Text style={styles.skillEmoji}>{skill.emoji}</Text>
+              <View style={[styles.interestIcon, { backgroundColor: interest.color + '22' }]}>
+                <Text style={styles.interestEmoji}>{interest.emoji}</Text>
               </View>
-              <Text style={[styles.skillName, isActive && { color: skill.color }]}>
-                {skill.name}
+              <Text style={[styles.interestName, isActive && { color: interest.color }]}>
+                {interest.name}
               </Text>
               {isActive && (
-                <Feather name="check" size={18} color={skill.color} />
+                <Feather name="check" size={18} color={interest.color} />
               )}
             </TouchableOpacity>
           );
@@ -76,11 +76,11 @@ export function SkillSwitcherSheet({ visible, onClose, onAddSkill }: Props) {
 
         <View style={styles.divider} />
 
-        <TouchableOpacity style={styles.addRow} onPress={onAddSkill} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.addRow} onPress={onAddInterest} activeOpacity={0.7}>
           <View style={styles.addIcon}>
             <Feather name="plus" size={18} color={Colors.textMuted} />
           </View>
-          <Text style={styles.addText}>Add skill</Text>
+          <Text style={styles.addText}>Add interest</Text>
         </TouchableOpacity>
       </Animated.View>
     </Modal>
@@ -124,23 +124,23 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: Spacing.sm,
   },
-  skillRow: {
+  interestRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: Spacing.md,
     gap: Spacing.md,
   },
-  skillIcon: {
+  interestIcon: {
     width: 40,
     height: 40,
     borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  skillEmoji: {
+  interestEmoji: {
     fontSize: 20,
   },
-  skillName: {
+  interestName: {
     ...Typography.body,
     fontWeight: '600',
     color: Colors.text,

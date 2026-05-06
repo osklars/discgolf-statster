@@ -1,24 +1,24 @@
 import { useCallback, useState } from 'react';
-import type { EntryFormState, Grid2DParam, Param, ParamValue } from '../types';
+import type { EntryFormState, Grid2DStatDef, StatDef, StatValue } from '../types';
 
 const GRID2D_SEP = '·';
 
-function isGrid2D(p: Param): p is Grid2DParam {
+function isGrid2D(p: StatDef): p is Grid2DStatDef {
   return p.type === 'grid2d';
 }
 
-export function useEntryForm(params: Param[], initialValues?: Record<string, ParamValue>): EntryFormState & {
+export function useEntryForm(stats: StatDef[], initialValues?: Record<string, StatValue>): EntryFormState & {
   toggleExpanded: (id: string) => void;
-  setValue: (id: string, value: ParamValue) => void;
+  setValue: (id: string, value: StatValue) => void;
   clearValue: (id: string) => void;
   clearAll: () => void;
   clearSubmitted: () => void;
-  formatValue: (param: Param, raw: ParamValue | undefined) => string;
+  formatValue: (stat: StatDef, raw: StatValue | undefined) => string;
 } {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
-    () => new Set(params.map((p) => p.id)),
+    () => new Set(stats.map((p) => p.id)),
   );
-  const [values, setValues] = useState<Record<string, ParamValue>>(initialValues ?? {});
+  const [values, setValues] = useState<Record<string, StatValue>>(initialValues ?? {});
 
   const toggleExpanded = useCallback((id: string) => {
     setExpandedIds((prev) => {
@@ -33,21 +33,21 @@ export function useEntryForm(params: Param[], initialValues?: Record<string, Par
   }, []);
 
   const setValue = useCallback(
-    (id: string, value: ParamValue) => {
+    (id: string, value: StatValue) => {
       setValues((prev) => {
         const next = { ...prev, [id]: value };
-        const param = params.find((p) => p.id === id);
-        if (param && isGrid2D(param)) {
+        const stat = stats.find((p) => p.id === id);
+        if (stat && isGrid2D(stat)) {
           const parts = value.split(GRID2D_SEP);
           if (parts.length === 2) {
-            next[param.axisX.id] = parts[0];
-            next[param.axisY.id] = parts[1];
+            next[stat.axisX.id] = parts[0];
+            next[stat.axisY.id] = parts[1];
           }
         }
         return next;
       });
     },
-    [params],
+    [stats],
   );
 
   const clearValue = useCallback(
@@ -55,35 +55,35 @@ export function useEntryForm(params: Param[], initialValues?: Record<string, Par
       setValues((prev) => {
         const next = { ...prev };
         delete next[id];
-        const param = params.find((p) => p.id === id);
-        if (param && isGrid2D(param)) {
-          delete next[param.axisX.id];
-          delete next[param.axisY.id];
+        const stat = stats.find((p) => p.id === id);
+        if (stat && isGrid2D(stat)) {
+          delete next[stat.axisX.id];
+          delete next[stat.axisY.id];
         }
         return next;
       });
     },
-    [params],
+    [stats],
   );
 
   const formatValue = useCallback(
-    (param: Param, raw: ParamValue | undefined): string => {
+    (stat: StatDef, raw: StatValue | undefined): string => {
       if (raw === undefined || raw === '') return '';
-      switch (param.type) {
+      switch (stat.type) {
         case 'scalar': {
           const n = parseFloat(raw);
           if (isNaN(n)) return raw;
           const formatted = Number.isInteger(n) ? String(n) : n.toFixed(1);
-          return param.unit ? `${formatted}${param.unit}` : formatted;
+          return stat.unit ? `${formatted}${stat.unit}` : formatted;
         }
         case 'named': {
-          const opt = param.options.find((o) => o.id === raw);
+          const opt = stat.options.find((o) => o.id === raw);
           return opt ? opt.label : raw;
         }
         case 'grid2d': {
           const parts = raw.split(GRID2D_SEP);
           if (parts.length !== 2) return raw;
-          return `${formatValue(param.axisX, parts[0])} × ${formatValue(param.axisY, parts[1])}`;
+          return `${formatValue(stat.axisX, parts[0])} × ${formatValue(stat.axisY, parts[1])}`;
         }
       }
     },
@@ -95,17 +95,17 @@ export function useEntryForm(params: Param[], initialValues?: Record<string, Par
   const clearSubmitted = useCallback(() => {
     setValues((prev) => {
       const next = { ...prev };
-      for (const param of params) {
-        if (param.clearAfterSubmit === false) continue;
-        delete next[param.id];
-        if (param.type === 'grid2d') {
-          delete next[param.axisX.id];
-          delete next[param.axisY.id];
+      for (const stat of stats) {
+        if (stat.clearAfterSubmit === false) continue;
+        delete next[stat.id];
+        if (stat.type === 'grid2d') {
+          delete next[stat.axisX.id];
+          delete next[stat.axisY.id];
         }
       }
       return next;
     });
-  }, [params]);
+  }, [stats]);
 
-  return { expandedIds, values, params, toggleExpanded, setValue, clearValue, clearAll, clearSubmitted, formatValue };
+  return { expandedIds, values, stats, toggleExpanded, setValue, clearValue, clearAll, clearSubmitted, formatValue };
 }

@@ -1,49 +1,49 @@
 import { randomUUID } from 'expo-crypto';
-import { getSkillDb } from './skillDb';
+import { getInterestDb } from './interestDb';
 
-export type SavedLevelFilter = {
-  parameterId: string;
-  paramName: string;
+export type LevelFilter = {
+  statId: string;
+  statName: string;
   optionId: string;
   optionLabel: string;
 };
 
-export type SavedLevel = {
+export type Level = {
   id: string;
   name: string;
-  filters: SavedLevelFilter[];
+  filters: LevelFilter[];
   sortOrder: number;
 };
 
-type SavedLevelRow = {
+type LevelRow = {
   id: string;
   name: string;
   filters: string;
   sort_order: number;
 };
 
-function fromRow(row: SavedLevelRow): SavedLevel {
+function fromRow(row: LevelRow): Level {
   return {
     id: row.id,
     name: row.name,
-    filters: JSON.parse(row.filters) as SavedLevelFilter[],
+    filters: JSON.parse(row.filters) as LevelFilter[],
     sortOrder: row.sort_order,
   };
 }
 
-export async function getSavedLevels(): Promise<SavedLevel[]> {
-  const db = getSkillDb();
-  const rows = await db.getAllAsync<SavedLevelRow>(
+export async function getLevels(): Promise<Level[]> {
+  const db = getInterestDb();
+  const rows = await db.getAllAsync<LevelRow>(
     'SELECT * FROM saved_level ORDER BY sort_order ASC, created_at ASC',
   );
   return rows.map(fromRow);
 }
 
-export async function insertSavedLevel(
+export async function insertLevel(
   name: string,
-  filters: SavedLevelFilter[],
-): Promise<SavedLevel> {
-  const db = getSkillDb();
+  filters: LevelFilter[],
+): Promise<Level> {
+  const db = getInterestDb();
   const id = randomUUID();
   const now = new Date().toISOString();
   const maxRow = await db.getFirstAsync<{ max_order: number | null }>(
@@ -57,13 +57,13 @@ export async function insertSavedLevel(
   return { id, name, filters, sortOrder };
 }
 
-export async function deleteSavedLevel(id: string): Promise<void> {
-  const db = getSkillDb();
+export async function deleteLevel(id: string): Promise<void> {
+  const db = getInterestDb();
   await db.runAsync('DELETE FROM saved_level WHERE id = ?', [id]);
 }
 
-export async function reorderSavedLevels(ids: string[]): Promise<void> {
-  const db = getSkillDb();
+export async function reorderLevels(ids: string[]): Promise<void> {
+  const db = getInterestDb();
   await db.withTransactionAsync(async () => {
     for (let i = 0; i < ids.length; i++) {
       await db.runAsync('UPDATE saved_level SET sort_order = ? WHERE id = ?', [i, ids[i]]);

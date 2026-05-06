@@ -16,30 +16,30 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { Colors, Radius, Spacing, Typography, hairline } from '../constants/theme';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { getForms, getFormParams, saveFormLayout, upsertForm, archiveForm } from '../db/forms';
-import { getScalarParameters, getNamedParameters } from '../db/parameters';
+import { getExercises, getExerciseStats, saveExerciseLayout, upsertExercise, archiveExercise } from '../db/forms';
+import { getNumberStats, getChoiceStats } from '../db/parameters';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'FormEditor'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'ExerciseEditor'>;
 
-type EditParam = {
-  paramId: string;
-  paramType: 'scalar' | 'named';
+type EditStat = {
+  statId: string;
+  statType: 'scalar' | 'named';
   name: string;
   clearAfterSubmit: boolean;
 };
 
-type LibParam = { id: string; name: string; paramType: 'scalar' | 'named' };
+type LibStat = { id: string; name: string; statType: 'scalar' | 'named' };
 
-export function FormEditorScreen({ route, navigation }: Props) {
-  const { formId, isNew, sortOrder: initialSortOrder } = route.params;
+export function ExerciseEditorScreen({ route, navigation }: Props) {
+  const { exerciseId, isNew, sortOrder: initialSortOrder } = route.params;
   const insets = useSafeAreaInsets();
-  const [formName, setFormName] = useState(isNew ? 'New Form' : '');
-  const formSortOrderRef = useRef(initialSortOrder ?? 0);
-  const [params, setParams] = useState<EditParam[]>([]);
-  const paramsRef = useRef<EditParam[]>([]);
-  paramsRef.current = params;
+  const [exerciseName, setExerciseName] = useState(isNew ? 'New Exercise' : '');
+  const exerciseSortOrderRef = useRef(initialSortOrder ?? 0);
+  const [stats, setStats] = useState<EditStat[]>([]);
+  const statsRef = useRef<EditStat[]>([]);
+  statsRef.current = stats;
   const [addSheetOpen, setAddSheetOpen] = useState(false);
-  const [addCandidates, setAddCandidates] = useState<LibParam[]>([]);
+  const [addCandidates, setAddCandidates] = useState<LibStat[]>([]);
 
   // ── Drag state ──────────────────────────────────────────────────────────────
   const dragFromIdx = useRef<number | null>(null);
@@ -51,11 +51,11 @@ export function FormEditorScreen({ route, navigation }: Props) {
   const rowOffsets = useRef<number[]>([]);
   const rowHeights = useRef<number[]>([]);
 
-  const persistRef = useRef<(updated: EditParam[]) => Promise<void>>(async () => {});
+  const persistRef = useRef<(updated: EditStat[]) => Promise<void>>(async () => {});
 
   // One PanResponder per item slot — recreated only when count changes
   const panResponders = useMemo(() =>
-    params.map((_, idx) => PanResponder.create({
+    stats.map((_, idx) => PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
         dragAnim.setValue(0);
@@ -71,7 +71,7 @@ export function FormEditorScreen({ route, navigation }: Props) {
         const targetY = fromY + g.dy;
         let best = idx;
         let bestDist = Infinity;
-        for (let i = 0; i < paramsRef.current.length; i++) {
+        for (let i = 0; i < statsRef.current.length; i++) {
           const midY = (rowOffsets.current[i] ?? 0) + (rowHeights.current[i] ?? 0) / 2;
           const dist = Math.abs(targetY - midY);
           if (dist < bestDist) { bestDist = dist; best = i; }
@@ -91,7 +91,7 @@ export function FormEditorScreen({ route, navigation }: Props) {
         setDragToIdx(null);
         setScrollEnabled(true);
         if (from !== null && to !== null && from !== to) {
-          setParams((prev) => {
+          setStats((prev) => {
             const next = [...prev];
             const [item] = next.splice(from, 1);
             next.splice(to, 0, item);
@@ -110,104 +110,103 @@ export function FormEditorScreen({ route, navigation }: Props) {
       },
     })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [params.length],
+    [stats.length],
   );
 
   // ── Data loading ────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
-    const [formList, formParams, scalars, named] = await Promise.all([
-      isNew ? Promise.resolve([]) : getForms(),
-      isNew ? Promise.resolve([]) : getFormParams(formId),
-      getScalarParameters(),
-      getNamedParameters(),
+    const [exerciseList, exerciseStats, numberStatsList, choiceStatsList] = await Promise.all([
+      isNew ? Promise.resolve([]) : getExercises(),
+      isNew ? Promise.resolve([]) : getExerciseStats(exerciseId),
+      getNumberStats(),
+      getChoiceStats(),
     ]);
 
     if (!isNew) {
-      const form = (formList as Awaited<ReturnType<typeof getForms>>).find((f) => f.id === formId);
-      if (form) {
-        setFormName(form.name);
-        formSortOrderRef.current = form.sortOrder;
+      const exercise = (exerciseList as Awaited<ReturnType<typeof getExercises>>).find((e) => e.id === exerciseId);
+      if (exercise) {
+        setExerciseName(exercise.name);
+        exerciseSortOrderRef.current = exercise.sortOrder;
       }
-      const scalarMap = new Map(scalars.map((s) => [s.id, s.name]));
-      const namedMap = new Map(named.map((n) => [n.id, n.name]));
-      const editParams: EditParam[] = [...(formParams as Awaited<ReturnType<typeof getFormParams>>)]
+      const numberMap = new Map(numberStatsList.map((s) => [s.id, s.name]));
+      const choiceMap = new Map(choiceStatsList.map((n) => [n.id, n.name]));
+      const editStats: EditStat[] = [...(exerciseStats as Awaited<ReturnType<typeof getExerciseStats>>)]
         .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map((fp) => ({
-          paramId: fp.paramId,
-          paramType: fp.paramType,
-          name: fp.paramType === 'scalar' ? (scalarMap.get(fp.paramId) ?? '?') : (namedMap.get(fp.paramId) ?? '?'),
-          clearAfterSubmit: fp.clearAfterSubmit,
+        .map((slot) => ({
+          statId: slot.statId,
+          statType: slot.statType,
+          name: slot.statType === 'scalar' ? (numberMap.get(slot.statId) ?? '?') : (choiceMap.get(slot.statId) ?? '?'),
+          clearAfterSubmit: slot.clearAfterSubmit,
         }));
-      setParams(editParams);
+      setStats(editStats);
     }
 
     const addedIds = new Set(
       isNew
-        ? paramsRef.current.map((p) => p.paramId)
-        : (formParams as Awaited<ReturnType<typeof getFormParams>>).map((fp) => fp.paramId),
+        ? statsRef.current.map((s) => s.statId)
+        : (exerciseStats as Awaited<ReturnType<typeof getExerciseStats>>).map((slot) => slot.statId),
     );
     setAddCandidates([
-      ...scalars.filter((s) => !addedIds.has(s.id)).map((s) => ({ id: s.id, name: s.name, paramType: 'scalar' as const })),
-      ...named.filter((n) => !addedIds.has(n.id)).map((n) => ({ id: n.id, name: n.name, paramType: 'named' as const })),
+      ...numberStatsList.filter((s) => !addedIds.has(s.id)).map((s) => ({ id: s.id, name: s.name, statType: 'scalar' as const })),
+      ...choiceStatsList.filter((n) => !addedIds.has(n.id)).map((n) => ({ id: n.id, name: n.name, statType: 'named' as const })),
     ]);
-  }, [formId, isNew]);
+  }, [exerciseId, isNew]);
 
   useEffect(() => { load().catch(console.error); }, [load]);
   useEffect(() => navigation.addListener('focus', () => load().catch(console.error)), [navigation, load]);
 
-  const persist = useCallback(async (updated: EditParam[]) => {
+  const persist = useCallback(async (updated: EditStat[]) => {
     if (isNew) return;
-    await saveFormLayout(
-      formId,
-      updated.map((p, i) => ({ type: p.paramType, paramId: p.paramId, sortOrder: i, clearAfterSubmit: p.clearAfterSubmit })),
+    await saveExerciseLayout(
+      exerciseId,
+      updated.map((s, i) => ({ type: s.statType, statId: s.statId, sortOrder: i, clearAfterSubmit: s.clearAfterSubmit })),
     );
-  }, [formId, isNew]);
+  }, [exerciseId, isNew]);
 
-  // Keep persistRef current so PanResponder release can call it
   persistRef.current = persist;
 
   const handleRename = useCallback(() => {
-    Alert.prompt('Rename form', undefined, async (name) => {
+    Alert.prompt('Rename exercise', undefined, async (name) => {
       if (!name?.trim()) return;
-      setFormName(name.trim());
-      if (!isNew) await upsertForm({ id: formId, name: name.trim(), sortOrder: formSortOrderRef.current });
-    }, 'plain-text', formName);
-  }, [formId, isNew, formName]);
+      setExerciseName(name.trim());
+      if (!isNew) await upsertExercise({ id: exerciseId, name: name.trim(), sortOrder: exerciseSortOrderRef.current });
+    }, 'plain-text', exerciseName);
+  }, [exerciseId, isNew, exerciseName]);
 
   const handleArchive = useCallback(async () => {
-    await archiveForm(formId);
+    await archiveExercise(exerciseId);
     navigation.goBack();
-  }, [formId, navigation]);
+  }, [exerciseId, navigation]);
 
   const handleSave = useCallback(async () => {
-    await upsertForm({ id: formId, name: formName.trim() || 'New Form', sortOrder: formSortOrderRef.current });
-    await saveFormLayout(
-      formId,
-      params.map((p, i) => ({ type: p.paramType, paramId: p.paramId, sortOrder: i, clearAfterSubmit: p.clearAfterSubmit })),
+    await upsertExercise({ id: exerciseId, name: exerciseName.trim() || 'New Exercise', sortOrder: exerciseSortOrderRef.current });
+    await saveExerciseLayout(
+      exerciseId,
+      stats.map((s, i) => ({ type: s.statType, statId: s.statId, sortOrder: i, clearAfterSubmit: s.clearAfterSubmit })),
     );
     navigation.goBack();
-  }, [formId, formName, params, navigation]);
+  }, [exerciseId, exerciseName, stats, navigation]);
 
-  const handleRemove = useCallback(async (paramId: string) => {
-    const next = params.filter((p) => p.paramId !== paramId);
-    setParams(next);
+  const handleRemove = useCallback(async (statId: string) => {
+    const next = stats.filter((s) => s.statId !== statId);
+    setStats(next);
     await persist(next);
-  }, [params, persist]);
+  }, [stats, persist]);
 
-  const handleToggleSticky = useCallback(async (paramId: string) => {
-    const next = params.map((p) =>
-      p.paramId === paramId ? { ...p, clearAfterSubmit: !p.clearAfterSubmit } : p,
+  const handleToggleSticky = useCallback(async (statId: string) => {
+    const next = stats.map((s) =>
+      s.statId === statId ? { ...s, clearAfterSubmit: !s.clearAfterSubmit } : s,
     );
-    setParams(next);
+    setStats(next);
     await persist(next);
-  }, [params, persist]);
+  }, [stats, persist]);
 
-  const handleAddExisting = useCallback(async (lib: LibParam) => {
+  const handleAddExisting = useCallback(async (lib: LibStat) => {
     setAddSheetOpen(false);
-    const next = [...params, { paramId: lib.id, paramType: lib.paramType, name: lib.name, clearAfterSubmit: true }];
-    setParams(next);
+    const next = [...stats, { statId: lib.id, statType: lib.statType, name: lib.name, clearAfterSubmit: true }];
+    setStats(next);
     await persist(next);
-  }, [params, persist]);
+  }, [stats, persist]);
 
   // ── Row shift helper ────────────────────────────────────────────────────────
   function rowShift(idx: number): number {
@@ -222,7 +221,7 @@ export function FormEditorScreen({ route, navigation }: Props) {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScreenHeader
-        title={formName || 'New Form'}
+        title={exerciseName || 'New Exercise'}
         onBack={() => navigation.goBack()}
         onTitlePress={handleRename}
         rightIcon={!isNew ? 'archive' : undefined}
@@ -235,10 +234,10 @@ export function FormEditorScreen({ route, navigation }: Props) {
         scrollEnabled={scrollEnabled}
       >
         <View style={styles.card}>
-          {params.length === 0 ? (
-            <Text style={styles.empty}>No params yet.</Text>
+          {stats.length === 0 ? (
+            <Text style={styles.empty}>No stats yet.</Text>
           ) : (
-            params.map((param, idx) => {
+            stats.map((stat, idx) => {
               const isActive = idx === activeIdx;
               const shift = rowShift(idx);
               const rowContent = (
@@ -253,27 +252,27 @@ export function FormEditorScreen({ route, navigation }: Props) {
 
                   {/* Name + type */}
                   <TouchableOpacity
-                    style={styles.paramBody}
-                    onPress={() => navigation.navigate('ParamEditor', { paramType: param.paramType, paramId: param.paramId })}
+                    style={styles.statBody}
+                    onPress={() => navigation.navigate('StatEditor', { statType: stat.statType, statId: stat.statId })}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.paramName}>{param.name}</Text>
-                    <Text style={styles.paramType}>{param.paramType === 'scalar' ? 'scalar' : 'named'}</Text>
+                    <Text style={styles.statName}>{stat.name}</Text>
+                    <Text style={styles.statType}>{stat.statType === 'scalar' ? 'number' : 'choice'}</Text>
                   </TouchableOpacity>
 
                   {/* Sticky toggle */}
                   <TouchableOpacity
-                    onPress={() => handleToggleSticky(param.paramId)}
-                    style={[styles.stickyBadge, !param.clearAfterSubmit && styles.stickyBadgeOn]}
+                    onPress={() => handleToggleSticky(stat.statId)}
+                    style={[styles.stickyBadge, !stat.clearAfterSubmit && styles.stickyBadgeOn]}
                   >
-                    <Text style={[styles.stickyLabel, !param.clearAfterSubmit && styles.stickyLabelOn]}>
+                    <Text style={[styles.stickyLabel, !stat.clearAfterSubmit && styles.stickyLabelOn]}>
                       sticky
                     </Text>
                   </TouchableOpacity>
 
                   {/* Remove */}
                   <TouchableOpacity
-                    onPress={() => handleRemove(param.paramId)}
+                    onPress={() => handleRemove(stat.statId)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
                     <Feather name="x" size={16} color={Colors.textMuted} />
@@ -284,11 +283,11 @@ export function FormEditorScreen({ route, navigation }: Props) {
               if (isActive) {
                 return (
                   <Animated.View
-                    key={param.paramId}
+                    key={stat.statId}
                     style={[
-                      styles.paramRow,
-                      idx > 0 && styles.paramRowBorder,
-                      styles.paramRowActive,
+                      styles.statRow,
+                      idx > 0 && styles.statRowBorder,
+                      styles.statRowActive,
                       { transform: [{ translateY: dragAnim }] },
                     ]}
                     onLayout={(e) => {
@@ -303,10 +302,10 @@ export function FormEditorScreen({ route, navigation }: Props) {
 
               return (
                 <View
-                  key={param.paramId}
+                  key={stat.statId}
                   style={[
-                    styles.paramRow,
-                    idx > 0 && styles.paramRowBorder,
+                    styles.statRow,
+                    idx > 0 && styles.statRowBorder,
                     shift !== 0 && { transform: [{ translateY: shift }] },
                   ]}
                   onLayout={(e) => {
@@ -323,7 +322,7 @@ export function FormEditorScreen({ route, navigation }: Props) {
 
         <TouchableOpacity style={styles.addBtn} onPress={() => setAddSheetOpen(true)} activeOpacity={0.7}>
           <Feather name="plus" size={15} color={Colors.primary} />
-          <Text style={styles.addBtnText}>Add param</Text>
+          <Text style={styles.addBtnText}>Add stat</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -344,35 +343,35 @@ export function FormEditorScreen({ route, navigation }: Props) {
         <TouchableOpacity style={sheet.backdrop} activeOpacity={1} onPress={() => setAddSheetOpen(false)} />
         <View style={sheet.panel}>
           <View style={sheet.handle} />
-          <Text style={sheet.title}>Add param</Text>
+          <Text style={sheet.title}>Add stat</Text>
           <ScrollView contentContainerStyle={sheet.list}>
             <TouchableOpacity
               style={sheet.row}
               onPress={() => {
                 setAddSheetOpen(false);
-                navigation.navigate('ParamEditor', {
-                  paramType: 'scalar',
-                  initialName: 'New Parameter',
-                  addToFormId: isNew ? undefined : formId,
+                navigation.navigate('StatEditor', {
+                  statType: 'scalar',
+                  initialName: 'New Stat',
+                  addToExerciseId: isNew ? undefined : exerciseId,
                 });
               }}
               activeOpacity={0.7}
             >
-              <Text style={[sheet.rowLabel, { color: Colors.primary }]}>+ New scalar param</Text>
+              <Text style={[sheet.rowLabel, { color: Colors.primary }]}>+ New number stat</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={sheet.row}
               onPress={() => {
                 setAddSheetOpen(false);
-                navigation.navigate('ParamEditor', {
-                  paramType: 'named',
-                  initialName: 'New Parameter',
-                  addToFormId: isNew ? undefined : formId,
+                navigation.navigate('StatEditor', {
+                  statType: 'named',
+                  initialName: 'New Stat',
+                  addToExerciseId: isNew ? undefined : exerciseId,
                 });
               }}
               activeOpacity={0.7}
             >
-              <Text style={[sheet.rowLabel, { color: Colors.primary }]}>+ New named param</Text>
+              <Text style={[sheet.rowLabel, { color: Colors.primary }]}>+ New choice stat</Text>
             </TouchableOpacity>
 
             {addCandidates.length > 0 && (
@@ -386,7 +385,7 @@ export function FormEditorScreen({ route, navigation }: Props) {
                     activeOpacity={0.7}
                   >
                     <Text style={sheet.rowLabel}>{lib.name}</Text>
-                    <Text style={sheet.rowType}>{lib.paramType}</Text>
+                    <Text style={sheet.rowType}>{lib.statType === 'scalar' ? 'number' : 'choice'}</Text>
                   </TouchableOpacity>
                 ))}
               </>
@@ -403,7 +402,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { padding: Spacing.lg, gap: Spacing.md },
   card: { backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden' },
-  paramRow: {
+  statRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: Spacing.sm,
@@ -411,8 +410,8 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     backgroundColor: Colors.surface,
   },
-  paramRowBorder: { borderTopWidth: hairline, borderTopColor: Colors.separator },
-  paramRowActive: {
+  statRowBorder: { borderTopWidth: hairline, borderTopColor: Colors.separator },
+  statRowActive: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.12,
@@ -425,9 +424,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     paddingVertical: 4,
   },
-  paramBody: { flex: 1, gap: 1 },
-  paramName: { ...Typography.body, color: Colors.text },
-  paramType: { ...Typography.labelSm, color: Colors.textMuted },
+  statBody: { flex: 1, gap: 1 },
+  statName: { ...Typography.body, color: Colors.text },
+  statType: { ...Typography.labelSm, color: Colors.textMuted },
   stickyBadge: {
     paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.pill,
     backgroundColor: Colors.background,

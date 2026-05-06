@@ -1,4 +1,4 @@
-export type ScalarParam = {
+export type NumberStatDef = {
   id: string;
   name: string;
   type: 'scalar';
@@ -12,7 +12,7 @@ export type ScalarParam = {
   clearAfterSubmit?: boolean;
 };
 
-export type NamedParam = {
+export type ChoiceStatDef = {
   id: string;
   name: string;
   type: 'named';
@@ -20,28 +20,28 @@ export type NamedParam = {
   clearAfterSubmit?: boolean;
 };
 
-export type Grid2DParam = {
+export type Grid2DStatDef = {
   id: string;
   name: string;
   type: 'grid2d';
-  axisX: ScalarParam;
-  axisY: ScalarParam;
+  axisX: NumberStatDef;
+  axisY: NumberStatDef;
   clearAfterSubmit?: boolean;
 };
 
-export type Param = ScalarParam | NamedParam | Grid2DParam;
+export type StatDef = NumberStatDef | ChoiceStatDef | Grid2DStatDef;
 
-// always a string: scalar → "85", named/disc → optionId, grid2d → "85·3"
-export type ParamValue = string;
+// always a string: scalar → "85", named → optionId, grid2d → "85·3"
+export type StatValue = string;
 
 export type EntryFormState = {
   expandedIds: Set<string>;
-  values: Record<string, ParamValue>;
-  params: Param[];
+  values: Record<string, StatValue>;
+  stats: StatDef[];
 };
 
-export type FormDefinition = {
+export type ExerciseDef = {
   id: string;
   name: string;
-  params: Param[];
+  params: StatDef[];
 };

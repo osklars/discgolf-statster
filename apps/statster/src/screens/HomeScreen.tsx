@@ -11,17 +11,17 @@ import { Feather } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { Colors, Radius, Spacing, Typography, hairline } from '../constants/theme';
-import { useSkill } from '../contexts/SkillContext';
-import { SkillSwitcherSheet } from '../components/SkillSwitcher/SkillSwitcherSheet';
+import { useInterest } from '../contexts/InterestContext';
+import { InterestSwitcherSheet } from '../components/InterestSwitcher/InterestSwitcherSheet';
 import type { SessionSummary } from '../db/types';
 import { getSessionsWithEntryCounts } from '../db/sessions';
-import { getSavedLevels } from '../db/savedLevels';
-import type { SavedLevel } from '../db/savedLevels';
+import { getLevels } from '../db/levels';
+import type { Level } from '../db/levels';
 import { queryEntries } from '../db/queries';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
-type TrackedItem = SavedLevel & { entryCount: number };
+type TrackedItem = Level & { entryCount: number };
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-SE', { month: 'short', day: 'numeric' });
@@ -30,30 +30,30 @@ function formatDate(dateStr: string): string {
 
 export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { activeSkill } = useSkill();
+  const { activeInterest } = useInterest();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [overallCount, setOverallCount] = useState<number | null>(null);
   const [tracked, setTracked] = useState<TrackedItem[]>([]);
 
   const loadData = useCallback(async () => {
-    const [allEntries, savedLevels, sessionList] = await Promise.all([
+    const [allEntries, levels, sessionList] = await Promise.all([
       queryEntries({}),
-      getSavedLevels(),
+      getLevels(),
       getSessionsWithEntryCounts(),
     ]);
 
-    const top4 = savedLevels.slice(0, 4);
+    const top4 = levels.slice(0, 4);
     const counts = await Promise.all(
-      top4.map((sl) =>
+      top4.map((level) =>
         queryEntries({
-          namedFilters: sl.filters.map((f) => ({ parameterId: f.parameterId, optionIds: [f.optionId] })),
+          choiceFilters: level.filters.map((f) => ({ statId: f.statId, optionIds: [f.optionId] })),
         }).then((entries) => entries.length),
       ),
     );
 
     setOverallCount(allEntries.length);
-    setTracked(top4.map((sl, i) => ({ ...sl, entryCount: counts[i] })));
+    setTracked(top4.map((level, i) => ({ ...level, entryCount: counts[i] })));
     setSessions(sessionList);
   }, []);
 
@@ -69,23 +69,23 @@ export function HomeScreen({ navigation }: Props) {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity
-          style={styles.skillButton}
+          style={styles.interestButton}
           onPress={() => setSwitcherOpen(true)}
           activeOpacity={0.7}
         >
-          <Text style={styles.skillEmoji}>{activeSkill.emoji}</Text>
-          <Text style={[styles.appTitle, { color: activeSkill.color }]}>{activeSkill.name}</Text>
-          <Feather name="chevron-down" size={18} color={activeSkill.color} style={styles.chevron} />
+          <Text style={styles.interestEmoji}>{activeInterest.emoji}</Text>
+          <Text style={[styles.appTitle, { color: activeInterest.color }]}>{activeInterest.name}</Text>
+          <Feather name="chevron-down" size={18} color={activeInterest.color} style={styles.chevron} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('Forms')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity onPress={() => navigation.navigate('Exercises')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="settings" size={20} color={Colors.textMuted} />
         </TouchableOpacity>
       </View>
 
-      <SkillSwitcherSheet
+      <InterestSwitcherSheet
         visible={switcherOpen}
         onClose={() => setSwitcherOpen(false)}
-        onAddSkill={() => setSwitcherOpen(false)}
+        onAddInterest={() => setSwitcherOpen(false)}
       />
 
       <ScrollView
@@ -111,7 +111,7 @@ export function HomeScreen({ navigation }: Props) {
           <View style={styles.trackedHeader}>
             <Text style={styles.sectionLabel}>TRACKED</Text>
             <TouchableOpacity
-              onPress={() => navigation.navigate('SavedLevels')}
+              onPress={() => navigation.navigate('Levels')}
               style={styles.manageBtn}
             >
               <Text style={styles.manageBtnText}>Manage</Text>
@@ -191,13 +191,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: hairline,
     borderBottomColor: Colors.separator,
   },
-  skillButton: {
+  interestButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
     alignSelf: 'flex-start',
   },
-  skillEmoji: { fontSize: 20 },
+  interestEmoji: { fontSize: 20 },
   appTitle: { fontSize: 22, fontWeight: '700', letterSpacing: -0.3 },
   chevron: { marginTop: 2 },
   scroll: { flex: 1 },

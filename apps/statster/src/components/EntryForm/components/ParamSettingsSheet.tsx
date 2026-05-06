@@ -19,7 +19,7 @@ import {
   Typography,
   hairline,
 } from '../../../constants/theme';
-import type { Grid2DParam, NamedParam, Param, ScalarParam } from '../types';
+import type { Grid2DStatDef, ChoiceStatDef, StatDef, NumberStatDef } from '../types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -45,7 +45,7 @@ type ScalarFields = {
   lblMax: string;
 };
 
-function scalarToFields(p: ScalarParam): ScalarFields {
+function scalarToFields(p: NumberStatDef): ScalarFields {
   return {
     name: p.name,
     min: String(p.min),
@@ -62,7 +62,7 @@ function defaultScalarFields(name = ''): ScalarFields {
   return { name, min: '0', max: '10', step: '1', majorStep: '1', unit: '', lblMin: '', lblMax: '' };
 }
 
-function buildScalar(id: string, fields: ScalarFields): ScalarParam {
+function buildScalar(id: string, fields: ScalarFields): NumberStatDef {
   return {
     id,
     name: fields.name,
@@ -155,14 +155,14 @@ function Grid2DEditContent({
   onDisband,
   onClose,
 }: {
-  initial: Grid2DParam;
-  onSave: (param: Param) => void;
+  initial: Grid2DStatDef;
+  onSave: (stat: StatDef) => void;
   onDisband: () => void;
   onClose: () => void;
 }) {
   const [title, setTitle] = useState(initial.name);
-  const [axisX, setAxisX] = useState<ScalarParam>(initial.axisX);
-  const [axisY, setAxisY] = useState<ScalarParam>(initial.axisY);
+  const [axisX, setAxisX] = useState<NumberStatDef>(initial.axisX);
+  const [axisY, setAxisY] = useState<NumberStatDef>(initial.axisY);
   const [editingAxis, setEditingAxis] = useState<'x' | 'y' | null>(null);
 
   // Fields for the axis currently being edited
@@ -289,8 +289,8 @@ function ScalarNamedContent({
   onSave,
   onClose,
 }: {
-  initial: Param | null;
-  onSave: (param: Param) => void;
+  initial: StatDef | null;
+  onSave: (stat: StatDef) => void;
   onClose: () => void;
 }) {
   const isNew = initial === null;
@@ -321,7 +321,7 @@ function ScalarNamedContent({
     if (paramType === 'scalar') {
       onSave(buildScalar(existingId, { ...scalarFields, name: scalarName }));
     } else {
-      const named: NamedParam = {
+      const named: ChoiceStatDef = {
         id: existingId,
         name: namedName,
         type: 'named',
@@ -337,7 +337,7 @@ function ScalarNamedContent({
         <TouchableOpacity onPress={onClose} style={ss.headerBtn} activeOpacity={0.7}>
           <Text style={ss.cancelText}>Cancel</Text>
         </TouchableOpacity>
-        <Text style={ss.headerTitle}>{isNew ? 'New Param' : 'Edit Param'}</Text>
+        <Text style={ss.headerTitle}>{isNew ? 'New Stat' : 'Edit Stat'}</Text>
         <TouchableOpacity onPress={handleSave} style={ss.headerBtn} activeOpacity={0.7}>
           <Text style={ss.saveText}>Save</Text>
         </TouchableOpacity>
@@ -407,8 +407,8 @@ function ScalarNamedContent({
 
 interface Props {
   visible: boolean;
-  initial: Param | null; // null = new param; Grid2DParam shows the simplified 2D editor
-  onSave: (param: Param) => void;
+  initial: StatDef | null;
+  onSave: (stat: StatDef) => void;
   onDisband: () => void;
   onClose: () => void;
 }
@@ -430,7 +430,7 @@ export function ParamSettingsSheet({ visible, initial, onSave, onDisband, onClos
         {isGrid2D ? (
           <Grid2DEditContent
             key={initial!.id}
-            initial={initial as Grid2DParam}
+            initial={initial as Grid2DStatDef}
             onSave={onSave}
             onDisband={onDisband}
             onClose={onClose}

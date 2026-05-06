@@ -24,29 +24,29 @@ import { Colors, Radius, Spacing, Typography, hairline } from '../constants/them
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { queryRichEntries } from '../db/queries';
 import type { RichEntry } from '../db/queries';
-import { getScalarParameters, getNamedParameters, getAllNamedOptions } from '../db/parameters';
-import type { ScalarParameter, NamedParameter, NamedOption } from '../db/types';
+import { getNumberStats, getChoiceStats, getAllChoiceOptions } from '../db/parameters';
+import type { NumberStat, ChoiceStat, ChoiceOption } from '../db/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StatDetail'>;
 
 // ── Filter types ──────────────────────────────────────────────────────────────
 
-type NamedFilter = { type: 'named'; parameterId: string; paramName: string; optionId: string; optionLabel: string };
-type ScalarFilter = { type: 'scalar'; parameterId: string; paramName: string; min: number; max: number };
-type ActiveFilter = NamedFilter | ScalarFilter;
+type ChoiceFilter = { type: 'named'; statId: string; statName: string; optionId: string; optionLabel: string };
+type NumberFilter = { type: 'scalar'; statId: string; statName: string; min: number; max: number };
+type ActiveFilter = ChoiceFilter | NumberFilter;
 
 function filterLabel(f: ActiveFilter): string {
-  return f.type === 'named' ? f.optionLabel : `${f.paramName} ${f.min}–${f.max}`;
+  return f.type === 'named' ? f.optionLabel : `${f.statName} ${f.min}–${f.max}`;
 }
 
 function filtersToQuery(filters: ActiveFilter[]) {
   return {
-    namedFilters: filters
-      .filter((f): f is NamedFilter => f.type === 'named')
-      .map((f) => ({ parameterId: f.parameterId, optionIds: [f.optionId] })),
-    scalarFilters: filters
-      .filter((f): f is ScalarFilter => f.type === 'scalar')
-      .map((f) => ({ parameterId: f.parameterId, min: f.min, max: f.max })),
+    choiceFilters: filters
+      .filter((f): f is ChoiceFilter => f.type === 'named')
+      .map((f) => ({ statId: f.statId, optionIds: [f.optionId] })),
+    numberFilters: filters
+      .filter((f): f is NumberFilter => f.type === 'scalar')
+      .map((f) => ({ statId: f.statId, min: f.min, max: f.max })),
   };
 }
 
@@ -319,9 +319,9 @@ const hist = StyleSheet.create({
 const NAMED_PREVIEW_ROWS = 2;
 const OPTION_ROW_H = 32;
 
-interface NamedParamCardProps {
-  param: NamedParameter;
-  options: NamedOption[];
+interface ChoiceStatCardProps {
+  param: ChoiceStat;
+  options: ChoiceOption[];
   entries: RichEntry[];
   expanded: boolean;
   onExpand(): void;
@@ -329,11 +329,11 @@ interface NamedParamCardProps {
   onSelect(optionId: string, optionLabel: string): void;
 }
 
-function NamedParamCard({ param, options, entries, expanded, onExpand, onCollapse, onSelect }: NamedParamCardProps) {
+function ChoiceStatCard({ param, options, entries, expanded, onExpand, onCollapse, onSelect }: ChoiceStatCardProps) {
   const counts: Record<string, number> = {};
   for (const entry of entries) {
     for (const dp of entry.named) {
-      if (dp.parameterId === param.id) counts[dp.optionId] = (counts[dp.optionId] ?? 0) + 1;
+      if (dp.statId === param.id) counts[dp.optionId] = (counts[dp.optionId] ?? 0) + 1;
     }
   }
 
@@ -385,25 +385,25 @@ function NamedParamCard({ param, options, entries, expanded, onExpand, onCollaps
   );
 }
 
-// ── Scalar param card ─────────────────────────────────────────────────────────
+// ── Number stat card ─────────────────────────────────────────────────────────
 
-interface ScalarParamCardProps {
-  param: ScalarParameter;
+interface NumberStatCardProps {
+  param: NumberStat;
   entries: RichEntry[];
   expanded: boolean;
   onExpand(): void;
   onCollapse(): void;
-  activeFilter: ScalarFilter | undefined;
+  activeFilter: NumberFilter | undefined;
   onApply(min: number, max: number): void;
 }
 
-function ScalarParamCard({ param, entries, expanded, onExpand, onCollapse, activeFilter, onApply }: ScalarParamCardProps) {
+function NumberStatCard({ param, entries, expanded, onExpand, onCollapse, activeFilter, onApply }: NumberStatCardProps) {
   const histRef = useRef<HistogramHandle>(null);
 
   const values: number[] = [];
   for (const entry of entries) {
     for (const dp of entry.scalars) {
-      if (dp.parameterId === param.id) values.push(dp.value);
+      if (dp.statId === param.id) values.push(dp.value);
     }
   }
 
@@ -454,18 +454,18 @@ export function StatDetailScreen({ navigation }: Props) {
   const [filters, setFilters] = useState<ActiveFilter[]>([]);
   const [entries, setEntries] = useState<RichEntry[]>([]);
   const [entryCount, setEntryCount] = useState<number | null>(null);
-  const [scalarParams, setScalarParams] = useState<ScalarParameter[]>([]);
-  const [namedParams, setNamedParams] = useState<NamedParameter[]>([]);
-  const [allOptions, setAllOptions] = useState<NamedOption[]>([]);
+  const [numberStats, setNumberStats] = useState<NumberStat[]>([]);
+  const [choiceStats, setChoiceStats] = useState<ChoiceStat[]>([]);
+  const [allOptions, setAllOptions] = useState<ChoiceOption[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [paramEntryCount, setParamEntryCount] = useState<Record<string, number>>({});
-  const [expandedParamId, setExpandedParamId] = useState<string | null>(null);
+  const [statEntryCount, setStatEntryCount] = useState<Record<string, number>>({});
+  const [expandedStatId, setExpandedStatId] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getScalarParameters(), getNamedParameters(), getAllNamedOptions()])
+    Promise.all([getNumberStats(), getChoiceStats(), getAllChoiceOptions()])
       .then(([scalars, named, options]) => {
-        setScalarParams(scalars);
-        setNamedParams(named);
+        setNumberStats(scalars);
+        setChoiceStats(named);
         setAllOptions(options);
       })
       .catch(console.error);
@@ -478,54 +478,54 @@ export function StatDetailScreen({ navigation }: Props) {
     for (const entry of richEntries) {
       const seen = new Set<string>();
       for (const dp of [...entry.scalars, ...entry.named]) {
-        if (!seen.has(dp.parameterId)) {
-          seen.add(dp.parameterId);
-          counts[dp.parameterId] = (counts[dp.parameterId] ?? 0) + 1;
+        if (!seen.has(dp.statId)) {
+          seen.add(dp.statId);
+          counts[dp.statId] = (counts[dp.statId] ?? 0) + 1;
         }
       }
     }
     setEntries(richEntries);
     setEntryCount(richEntries.length);
-    setParamEntryCount(counts);
+    setStatEntryCount(counts);
     setInitialLoading(false);
   }, []);
 
   useEffect(() => { reload(filters).catch(console.error); }, [filters, reload]);
   useEffect(() => { return navigation.addListener('focus', () => reload(filters).catch(console.error)); }, [navigation, filters, reload]);
 
-  const filteredParamIds = new Set(filters.map((f) => f.parameterId));
+  const filteredStatIds = new Set(filters.map((f) => f.statId));
 
   const toggleExpanded = useCallback((id: string) => {
-    setExpandedParamId((prev) => (prev === id ? null : id));
+    setExpandedStatId((prev) => (prev === id ? null : id));
   }, []);
 
-  const addNamedFilter = useCallback((parameterId: string, paramName: string, optionId: string, optionLabel: string) => {
+  const addChoiceFilter = useCallback((statId: string, statName: string, optionId: string, optionLabel: string) => {
     setFilters((prev) => {
-      const without = prev.filter((f) => !(f.type === 'named' && f.parameterId === parameterId));
-      return [...without, { type: 'named', parameterId, paramName, optionId, optionLabel }];
+      const without = prev.filter((f) => !(f.type === 'named' && f.statId === statId));
+      return [...without, { type: 'named', statId, statName, optionId, optionLabel }];
     });
-    setExpandedParamId(null);
+    setExpandedStatId(null);
   }, []);
 
-  const addScalarFilter = useCallback((parameterId: string, paramName: string, min: number, max: number) => {
+  const addNumberFilter = useCallback((statId: string, statName: string, min: number, max: number) => {
     setFilters((prev) => {
-      const without = prev.filter((f) => !(f.type === 'scalar' && f.parameterId === parameterId));
-      return [...without, { type: 'scalar', parameterId, paramName, min, max }];
+      const without = prev.filter((f) => !(f.type === 'scalar' && f.statId === statId));
+      return [...without, { type: 'scalar', statId, statName, min, max }];
     });
-    setExpandedParamId(null);
+    setExpandedStatId(null);
   }, []);
 
   const removeFilter = useCallback((toRemove: ActiveFilter) => {
-    setFilters((prev) => prev.filter((f) => f.parameterId !== toRemove.parameterId));
+    setFilters((prev) => prev.filter((f) => f.statId !== toRemove.statId));
   }, []);
 
-  const sortedNamed = [...namedParams]
-    .filter((p) => !filteredParamIds.has(p.id))
-    .sort((a, b) => (paramEntryCount[b.id] ?? 0) - (paramEntryCount[a.id] ?? 0));
+  const sortedChoice = [...choiceStats]
+    .filter((p) => !filteredStatIds.has(p.id))
+    .sort((a, b) => (statEntryCount[b.id] ?? 0) - (statEntryCount[a.id] ?? 0));
 
-  const sortedScalar = [...scalarParams]
-    .filter((p) => !filteredParamIds.has(p.id))
-    .sort((a, b) => (paramEntryCount[b.id] ?? 0) - (paramEntryCount[a.id] ?? 0));
+  const sortedNumber = [...numberStats]
+    .filter((p) => !filteredStatIds.has(p.id))
+    .sort((a, b) => (statEntryCount[b.id] ?? 0) - (statEntryCount[a.id] ?? 0));
 
   if (initialLoading) {
     return (
@@ -546,36 +546,36 @@ export function StatDetailScreen({ navigation }: Props) {
       >
         <SummaryCard entryCount={entryCount} filters={filters} onRemoveFilter={removeFilter} />
 
-        {sortedNamed.map((param) => {
-          const options = allOptions.filter((o) => o.parameterId === param.id && o.archivedAt === null);
-          const expanded = expandedParamId === param.id;
+        {sortedChoice.map((param) => {
+          const options = allOptions.filter((o) => o.statId === param.id && o.archivedAt === null);
+          const expanded = expandedStatId === param.id;
           return (
-            <NamedParamCard
+            <ChoiceStatCard
               key={param.id}
               param={param}
               options={options}
               entries={entries}
               expanded={expanded}
               onExpand={() => toggleExpanded(param.id)}
-              onCollapse={() => setExpandedParamId(null)}
-              onSelect={(optionId, optionLabel) => addNamedFilter(param.id, param.name, optionId, optionLabel)}
+              onCollapse={() => setExpandedStatId(null)}
+              onSelect={(optionId, optionLabel) => addChoiceFilter(param.id, param.name, optionId, optionLabel)}
             />
           );
         })}
 
-        {sortedScalar.map((param) => {
-          const expanded = expandedParamId === param.id;
-          const activeFilter = filters.find((f): f is ScalarFilter => f.type === 'scalar' && f.parameterId === param.id);
+        {sortedNumber.map((param) => {
+          const expanded = expandedStatId === param.id;
+          const activeFilter = filters.find((f): f is NumberFilter => f.type === 'scalar' && f.statId === param.id);
           return (
-            <ScalarParamCard
+            <NumberStatCard
               key={param.id}
               param={param}
               entries={entries}
               expanded={expanded}
               onExpand={() => toggleExpanded(param.id)}
-              onCollapse={() => setExpandedParamId(null)}
+              onCollapse={() => setExpandedStatId(null)}
               activeFilter={activeFilter}
-              onApply={(min, max) => addScalarFilter(param.id, param.name, min, max)}
+              onApply={(min, max) => addNumberFilter(param.id, param.name, min, max)}
             />
           );
         })}

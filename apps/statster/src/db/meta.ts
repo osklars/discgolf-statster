@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import type { Skill } from '../contexts/SkillContext';
+import type { Interest } from '../contexts/InterestContext';
 
 let _db: SQLite.SQLiteDatabase | null = null;
 
@@ -27,7 +27,7 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
   return _db;
 }
 
-type SkillRow = {
+type InterestRow = {
   id: string;
   name: string;
   emoji: string;
@@ -35,27 +35,27 @@ type SkillRow = {
   db_file: string;
 };
 
-function rowToSkill(row: SkillRow): Skill {
+function rowToInterest(row: InterestRow): Interest {
   return { id: row.id, name: row.name, emoji: row.emoji, color: row.color, dbFile: row.db_file };
 }
 
-export async function getAllSkills(): Promise<Skill[]> {
+export async function getAllInterests(): Promise<Interest[]> {
   const db = await getDb();
-  const rows = await db.getAllAsync<SkillRow>(
+  const rows = await db.getAllAsync<InterestRow>(
     'SELECT * FROM skills ORDER BY sort_order ASC, created_at ASC',
   );
-  return rows.map(rowToSkill);
+  return rows.map(rowToInterest);
 }
 
-export async function insertSkill(skill: Skill): Promise<void> {
+export async function insertInterest(interest: Interest): Promise<void> {
   const db = await getDb();
   await db.runAsync(
     'INSERT INTO skills (id, name, emoji, color, db_file, sort_order, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
-    [skill.id, skill.name, skill.emoji, skill.color, skill.dbFile, Date.now()],
+    [interest.id, interest.name, interest.emoji, interest.color, interest.dbFile, Date.now()],
   );
 }
 
-export async function getActiveSkillId(): Promise<string | null> {
+export async function getActiveInterestId(): Promise<string | null> {
   const db = await getDb();
   const row = await db.getFirstAsync<{ value: string }>(
     "SELECT value FROM app_state WHERE key = 'active_skill_id'",
@@ -63,7 +63,7 @@ export async function getActiveSkillId(): Promise<string | null> {
   return row?.value ?? null;
 }
 
-export async function setActiveSkillId(id: string): Promise<void> {
+export async function setActiveInterestId(id: string): Promise<void> {
   const db = await getDb();
   await db.runAsync(
     "INSERT OR REPLACE INTO app_state (key, value) VALUES ('active_skill_id', ?)",

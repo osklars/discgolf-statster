@@ -13,18 +13,18 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { Colors, MIN_HIT, Radius, Spacing, Typography, hairline } from '../constants/theme';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { getSavedLevels, deleteSavedLevel, reorderSavedLevels } from '../db/savedLevels';
-import type { SavedLevel } from '../db/savedLevels';
+import { getLevels, deleteLevel, reorderLevels } from '../db/levels';
+import type { Level } from '../db/levels';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'SavedLevels'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'Levels'>;
 
-export function SavedLevelsScreen({ navigation }: Props) {
+export function LevelsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const [levels, setLevels] = useState<SavedLevel[]>([]);
+  const [levels, setLevels] = useState<Level[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const data = await getSavedLevels();
+    const data = await getLevels();
     setLevels(data);
     setLoading(false);
   }, []);
@@ -38,20 +38,20 @@ export function SavedLevelsScreen({ navigation }: Props) {
     const swapIndex = direction === 'up' ? index - 1 : index + 1;
     [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
     setLevels(next);
-    await reorderSavedLevels(next.map((l) => l.id));
+    await reorderLevels(next.map((l) => l.id));
   };
 
   const remove = async (id: string) => {
     const next = levels.filter((l) => l.id !== id);
     setLevels(next);
-    await deleteSavedLevel(id);
-    await reorderSavedLevels(next.map((l) => l.id));
+    await deleteLevel(id);
+    await reorderLevels(next.map((l) => l.id));
   };
 
   if (loading) {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
-        <ScreenHeader title="Saved Levels" onBack={() => navigation.goBack()} />
+        <ScreenHeader title="Levels" onBack={() => navigation.goBack()} />
         <ActivityIndicator color={Colors.primary} style={{ flex: 1 }} />
       </View>
     );
@@ -59,10 +59,10 @@ export function SavedLevelsScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Saved Levels" onBack={() => navigation.goBack()} />
+      <ScreenHeader title="Levels" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.lg }]} showsVerticalScrollIndicator={false}>
         <Text style={styles.hint}>
-          The top 4 saved levels appear on the home screen. Reorder to choose which ones show.
+          The top 4 levels appear on the home screen. Reorder to choose which ones show.
         </Text>
 
         {levels.map((level, index) => (
@@ -85,8 +85,8 @@ export function SavedLevelsScreen({ navigation }: Props) {
               {level.filters.length > 0 ? (
                 <View style={styles.filterTags}>
                   {level.filters.map((f) => (
-                    <View key={f.parameterId} style={styles.filterTag}>
-                      <Text style={styles.filterTagText}>{f.paramName}: {f.optionLabel}</Text>
+                    <View key={f.statId} style={styles.filterTag}>
+                      <Text style={styles.filterTagText}>{f.statName}: {f.optionLabel}</Text>
                     </View>
                   ))}
                 </View>
@@ -119,7 +119,7 @@ export function SavedLevelsScreen({ navigation }: Props) {
 
         {levels.length === 0 && (
           <Text style={styles.emptyText}>
-            No saved levels yet. Open Stats, set filters, and tap the bookmark icon to save a level.
+            No levels yet. Open Stats, set filters, and tap the bookmark icon to save a level.
           </Text>
         )}
       </ScrollView>
@@ -129,7 +129,6 @@ export function SavedLevelsScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
   content: { padding: Spacing.lg, gap: Spacing.sm, paddingBottom: Spacing.xl },
   hint: {
     ...Typography.labelSm,

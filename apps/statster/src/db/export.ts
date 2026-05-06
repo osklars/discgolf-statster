@@ -1,4 +1,4 @@
-import { getSkillDb } from './skillDb';
+import { getInterestDb } from './interestDb';
 import type { Session } from './types';
 
 export type ExportedParameter =
@@ -29,7 +29,7 @@ type ScalarJoinRow = { entry_id: string; parameter_id: string; param_name: strin
 type NamedJoinRow = { entry_id: string; parameter_id: string; param_name: string; option_id: string; option_label: string };
 
 export async function exportSession(sessionId: string): Promise<ExportedSession | null> {
-  const db = getSkillDb();
+  const db = getInterestDb();
 
   const sessionRow = await db.getFirstAsync<SessionRow>(
     'SELECT id, name, started_at, finished_at, notes FROM session WHERE id = ?',

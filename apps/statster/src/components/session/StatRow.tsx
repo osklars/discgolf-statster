@@ -8,10 +8,10 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { FittingPills } from './FittingPills';
 import { ScalarInput } from '../EntryForm/components/inputs/ScalarInput';
-import type { ScalarParam } from '../EntryForm/types';
+import type { NumberStatDef } from '../EntryForm/types';
 import { Colors, Radius, Spacing, Typography, hairline } from '../../constants/theme';
 
-export type ParamRowDef =
+export type StatRowDef =
   | {
       type: 'scalar' | 'quality';
       id: string;
@@ -35,8 +35,8 @@ export type ParamRowDef =
       oneOff?: boolean;
     };
 
-interface ParamRowProps {
-  param: ParamRowDef;
+interface StatRowProps {
+  param: StatRowDef;
   value: string | undefined;
   expanded: boolean;
   onToggle: () => void;
@@ -48,7 +48,7 @@ interface ParamRowProps {
 
 // ── Collapsed display ─────────────────────────────────────────────────────────
 
-function displayValue(param: ParamRowDef, value: string | undefined): string {
+function displayValue(param: StatRowDef, value: string | undefined): string {
   if (!value) return '—';
   if (param.type === 'named') {
     const opt = param.options.find((o) => o.id === value);
@@ -57,9 +57,9 @@ function displayValue(param: ParamRowDef, value: string | undefined): string {
   return `${value}${param.unit ?? ''}`;
 }
 
-// ── ParamRow ──────────────────────────────────────────────────────────────────
+// ── StatRow ───────────────────────────────────────────────────────────────────
 
-export function ParamRow({ param, value, expanded, onToggle, onChange, onAddOption, onRemove, onDragStart }: ParamRowProps) {
+export function StatRow({ param, value, expanded, onToggle, onChange, onAddOption, onRemove, onDragStart }: StatRowProps) {
   const [liveValue, setLiveValue] = useState<string | null>(null);
 
   const currentDisplay = liveValue !== null
@@ -75,7 +75,7 @@ export function ParamRow({ param, value, expanded, onToggle, onChange, onAddOpti
       {/* Collapsed header — always visible */}
       <TouchableOpacity style={styles.header} onPress={onToggle} activeOpacity={0.7}>
         <View style={styles.headerLeft}>
-          <Text style={styles.paramName}>{param.name}</Text>
+          <Text style={styles.statName}>{param.name}</Text>
           {param.oneOff && (
             <Text style={styles.oneOffBadge}>one-off</Text>
           )}
@@ -109,7 +109,7 @@ export function ParamRow({ param, value, expanded, onToggle, onChange, onAddOpti
             />
           ) : (
             <ScalarInput
-              param={param as unknown as ScalarParam}
+              param={param as unknown as NumberStatDef}
               value={scalarNumeric !== undefined && !isNaN(scalarNumeric) ? scalarNumeric : undefined}
               onDragStart={onDragStart ?? (() => {})}
               onLiveUpdate={(v) => setLiveValue(String(v))}
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   },
   headerLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  paramName: { ...Typography.label, color: Colors.text, fontWeight: '500' },
+  statName: { ...Typography.label, color: Colors.text, fontWeight: '500' },
   oneOffBadge: {
     ...Typography.labelSm,
     color: Colors.primary,

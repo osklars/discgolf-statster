@@ -1,10 +1,10 @@
 import * as SQLite from 'expo-sqlite';
-import { SKILL_DB_SCHEMA } from './schema';
+import { INTEREST_DB_SCHEMA } from './schema';
 
 let _db: SQLite.SQLiteDatabase | null = null;
 let _dbFile: string | null = null;
 
-export async function openSkillDb(dbFile: string): Promise<SQLite.SQLiteDatabase> {
+export async function openInterestDb(dbFile: string): Promise<SQLite.SQLiteDatabase> {
   if (_db && _dbFile === dbFile) return _db;
 
   if (_db) {
@@ -14,7 +14,7 @@ export async function openSkillDb(dbFile: string): Promise<SQLite.SQLiteDatabase
 
   _db = await SQLite.openDatabaseAsync(dbFile);
   _dbFile = dbFile;
-  await _db.execAsync(SKILL_DB_SCHEMA);
+  await _db.execAsync(INTEREST_DB_SCHEMA);
   try { await _db.execAsync('ALTER TABLE session ADD COLUMN name TEXT'); } catch {}
   try { await _db.execAsync('ALTER TABLE scalar_parameter ADD COLUMN archived_at TEXT'); } catch {}
   try { await _db.execAsync('ALTER TABLE named_parameter ADD COLUMN archived_at TEXT'); } catch {}
@@ -23,7 +23,7 @@ export async function openSkillDb(dbFile: string): Promise<SQLite.SQLiteDatabase
   return _db;
 }
 
-export function getSkillDb(): SQLite.SQLiteDatabase {
-  if (!_db) throw new Error('No skill DB open — call openSkillDb first');
+export function getInterestDb(): SQLite.SQLiteDatabase {
+  if (!_db) throw new Error('No interest DB open — call openInterestDb first');
   return _db;
 }

@@ -2,10 +2,10 @@ import React, { useRef } from 'react';
 import { PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Colors, HIT_SLOP, Spacing, Typography, hairline } from '../../../constants/theme';
-import type { Param } from '../types';
+import type { StatDef } from '../types';
 
 interface Props {
-  param: Param;
+  param: StatDef;
   isDragging: boolean;
   isCombineTarget: boolean;
   combineSourceAsX: boolean; // true = left half (source→X) highlighted
@@ -18,7 +18,7 @@ interface Props {
   onDragHandleRelease: () => void;
 }
 
-const TYPE_LABELS: Record<Param['type'], string> = {
+const TYPE_LABELS: Record<StatDef['type'], string> = {
   scalar: 'scalar',
   named: 'named',
   grid2d: '2D',

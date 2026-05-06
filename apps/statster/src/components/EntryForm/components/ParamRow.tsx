@@ -7,7 +7,7 @@ import {
   Typography,
   hairline,
 } from '../../../constants/theme';
-import type { Grid2DParam, NamedParam, Param, ParamValue, ScalarParam } from '../types';
+import type { Grid2DStatDef, ChoiceStatDef, StatDef, StatValue, NumberStatDef } from '../types';
 import { Grid2DInput } from './inputs/Grid2DInput';
 import { PillPicker } from './inputs/PillPicker';
 import { ScalarInput } from './inputs/ScalarInput';
@@ -15,13 +15,13 @@ import { ScalarInput } from './inputs/ScalarInput';
 const GRID2D_SEP = '·';
 
 interface Props {
-  param: Param;
-  value: ParamValue | undefined;
+  param: StatDef;
+  value: StatValue | undefined;
   isExpanded: boolean;
   onToggle: () => void;
-  onCommit: (value: ParamValue) => void;
+  onCommit: (value: StatValue) => void;
   onClear: () => void;
-  formatValue: (param: Param, raw: ParamValue | undefined) => string;
+  formatValue: (stat: StatDef, raw: StatValue | undefined) => string;
   onDragStart: () => void;
 }
 
@@ -48,6 +48,7 @@ export function ParamRow({
     [param, formatValue],
   );
 
+
   const handleScalarCommit = useCallback(
     (v: number) => {
       setLiveDisplay(null);
@@ -58,8 +59,8 @@ export function ParamRow({
 
   const handleGrid2DLive = useCallback(
     (x: number, y: number) => {
-      const p = param as Grid2DParam;
-      const fmtAxis = (v: number, axis: ScalarParam): string =>
+      const p = param as Grid2DStatDef;
+      const fmtAxis = (v: number, axis: NumberStatDef): string =>
         axis.unit ? `${v}${axis.unit}` : String(v);
       setLiveDisplay(`${fmtAxis(x, p.axisX)} × ${fmtAxis(y, p.axisY)}`);
     },
@@ -85,7 +86,7 @@ export function ParamRow({
   const renderInput = () => {
     switch (param.type) {
       case 'scalar': {
-        const p = param as ScalarParam;
+        const p = param as NumberStatDef;
         const n = value !== undefined ? parseFloat(value) : undefined;
         return (
           <ScalarInput
@@ -98,13 +99,13 @@ export function ParamRow({
         );
       }
       case 'named': {
-        const p = param as NamedParam;
+        const p = param as ChoiceStatDef;
         return (
           <PillPicker options={p.options} selectedId={value} onSelect={handleAutoCloseCommit} />
         );
       }
       case 'grid2d': {
-        const p = param as Grid2DParam;
+        const p = param as Grid2DStatDef;
         const parts = value ? value.split(GRID2D_SEP) : [];
         const xNum = parts[0] !== undefined ? parseFloat(parts[0]) : undefined;
         const yNum = parts[1] !== undefined ? parseFloat(parts[1]) : undefined;

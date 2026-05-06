@@ -1,5 +1,5 @@
 import { randomUUID } from 'expo-crypto';
-import { getSkillDb } from './skillDb';
+import { getInterestDb } from './interestDb';
 import type { Session, SessionSummary } from './types';
 
 function uid(): string {
@@ -24,7 +24,7 @@ export async function startSession(name?: string, notes?: string): Promise<Sessi
     notes: notes ?? null,
     name: name ?? null,
   };
-  await getSkillDb().runAsync(
+  await getInterestDb().runAsync(
     'INSERT INTO session (id, started_at, finished_at, notes, name) VALUES (?, ?, NULL, ?, ?)',
     [session.id, session.startedAt, session.notes, session.name],
   );
@@ -32,18 +32,18 @@ export async function startSession(name?: string, notes?: string): Promise<Sessi
 }
 
 export async function renameSession(sessionId: string, name: string): Promise<void> {
-  await getSkillDb().runAsync('UPDATE session SET name = ? WHERE id = ?', [name.trim() || null, sessionId]);
+  await getInterestDb().runAsync('UPDATE session SET name = ? WHERE id = ?', [name.trim() || null, sessionId]);
 }
 
 export async function getSession(id: string): Promise<Session | null> {
-  const row = await getSkillDb().getFirstAsync<SessionRow>(
+  const row = await getInterestDb().getFirstAsync<SessionRow>(
     'SELECT * FROM session WHERE id = ?', [id],
   );
   return row ? toSession(row) : null;
 }
 
 export async function getSessionsWithEntryCounts(): Promise<SessionSummary[]> {
-  const rows = await getSkillDb().getAllAsync<{ id: string; started_at: string; entry_count: number; name: string | null }>(
+  const rows = await getInterestDb().getAllAsync<{ id: string; started_at: string; entry_count: number; name: string | null }>(
     `SELECT s.id, s.started_at, s.name, COUNT(e.id) AS entry_count
      FROM session s
      LEFT JOIN entry e ON e.session_id = s.id

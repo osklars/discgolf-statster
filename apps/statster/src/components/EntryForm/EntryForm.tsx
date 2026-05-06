@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { Colors, Radius, Spacing, Typography, hairline } from '../../constants/theme';
-import type { FormDefinition, NamedParam, Param, ParamValue, ScalarParam } from './types';
+import type { ExerciseDef, ChoiceStatDef, StatDef, StatValue, NumberStatDef } from './types';
 import { ParamRow } from './components/ParamRow';
 import { StickyBar } from './components/StickyBar';
 import { FormHeader } from './components/FormHeader';
@@ -21,12 +21,12 @@ import { ParamSettingsSheet } from './components/ParamSettingsSheet';
 import { AddParamSheet } from './components/AddParamSheet';
 import { useEntryForm } from './hooks/useEntryForm';
 import { useEditForm } from './hooks/useEditForm';
-import { loadFormDefinitions, saveFormDefinitionToDb, saveParamToDb } from '../../db/mappers';
-import { upsertForm } from '../../db/forms';
+import { loadExerciseDefs, saveExerciseDefToDb, saveStatToDb } from '../../db/mappers';
+import { upsertExercise } from '../../db/forms';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getParamIdsInDraft(draft: Param[]): Set<string> {
+function getParamIdsInDraft(draft: StatDef[]): Set<string> {
   const ids = new Set<string>();
   for (const p of draft) {
     if (p.type === 'grid2d') {
@@ -44,106 +44,106 @@ function getParamIdsInDraft(draft: Param[]): Set<string> {
 interface EntryFormProps {
   onBack?: () => void;
   entryCount?: number;
-  onLogThrow?: (formId: string, params: Param[], values: Record<string, ParamValue>) => Promise<void>;
+  onLogThrow?: (exerciseId: string, stats: StatDef[], values: Record<string, StatValue>) => Promise<void>;
 }
 
 export function EntryForm({ onBack, entryCount = 0, onLogThrow }: EntryFormProps = {}) {
-  const [formDefs, setFormDefs] = useState<FormDefinition[]>([]);
+  const [exerciseDefs, setExerciseDefs] = useState<ExerciseDef[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [paramLibrary, setParamLibrary] = useState<(ScalarParam | NamedParam)[]>([]);
+  const [statLibrary, setStatLibrary] = useState<(NumberStatDef | ChoiceStatDef)[]>([]);
   const [dbReady, setDbReady] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editKey, setEditKey] = useState(0);
-  const [stickyValues, setStickyValues] = useState<Record<string, ParamValue>>({});
+  const [stickyValues, setStickyValues] = useState<Record<string, StatValue>>({});
 
-  const handleStickyChange = useCallback((paramId: string, value: ParamValue | undefined) => {
+  const handleStickyChange = useCallback((statId: string, value: StatValue | undefined) => {
     setStickyValues((prev) => {
       const next = { ...prev };
       if (value === undefined) {
-        delete next[paramId];
+        delete next[statId];
       } else {
-        next[paramId] = value;
+        next[statId] = value;
       }
       return next;
     });
   }, []);
 
   useEffect(() => {
-    loadFormDefinitions()
-      .then(({ forms, paramLibrary: lib }) => {
-        setFormDefs(forms);
-        setActiveId(forms[0]?.id ?? null);
-        setParamLibrary(lib);
+    loadExerciseDefs()
+      .then(({ exercises, statLibrary: lib }) => {
+        setExerciseDefs(exercises);
+        setActiveId(exercises[0]?.id ?? null);
+        setStatLibrary(lib);
         setDbReady(true);
       })
       .catch(console.error);
   }, []);
 
-  const activeDef = formDefs.find((f) => f.id === activeId) ?? formDefs[0];
+  const activeDef = exerciseDefs.find((f) => f.id === activeId) ?? exerciseDefs[0];
 
   const enterEdit = () => {
     setEditKey((k) => k + 1);
     setIsEditMode(true);
   };
 
-  const handleRenameForm = useCallback(() => {
+  const handleRenameExercise = useCallback(() => {
     if (!activeDef) return;
     Alert.prompt(
-      'Rename form',
+      'Rename exercise',
       'Enter a new name',
       async (name) => {
         if (!name?.trim()) return;
-        await upsertForm({ id: activeDef.id, name: name.trim(), sortOrder: 0 });
-        setFormDefs((prev) => prev.map((f) => (f.id === activeDef.id ? { ...f, name: name.trim() } : f)));
+        await upsertExercise({ id: activeDef.id, name: name.trim(), sortOrder: 0 });
+        setExerciseDefs((prev) => prev.map((f) => (f.id === activeDef.id ? { ...f, name: name.trim() } : f)));
       },
       'plain-text',
       activeDef.name,
     );
   }, [activeDef]);
 
-  const handleAddForm = useCallback(() => {
+  const handleAddExercise = useCallback(() => {
     Alert.prompt(
-      'New form',
-      'Enter a name for the new form',
+      'New exercise',
+      'Enter a name for the new exercise',
       async (name) => {
         if (!name?.trim()) return;
-        const newDef: FormDefinition = {
+        const newDef: ExerciseDef = {
           id: randomUUID(),
           name: name.trim(),
           params: [],
         };
-        await saveFormDefinitionToDb(newDef);
-        setFormDefs((prev) => [...prev, newDef]);
+        await saveExerciseDefToDb(newDef);
+        setExerciseDefs((prev) => [...prev, newDef]);
         setActiveId(newDef.id);
       },
       'plain-text',
     );
-  }, [formDefs.length]);
+  }, [exerciseDefs.length]);
 
   const handleOverwrite = useCallback(
-    async (draft: Param[]) => {
+    async (draft: StatDef[]) => {
       const updated = { ...activeDef, params: draft };
-      await saveFormDefinitionToDb(updated);
-      setFormDefs((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
+      await saveExerciseDefToDb(updated);
+      setExerciseDefs((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
       setIsEditMode(false);
     },
     [activeDef],
   );
 
   const handleSaveAsNew = useCallback(
-    (draft: Param[]) => {
+    (draft: StatDef[]) => {
       Alert.prompt(
         'Save as new',
-        'Enter a name for the new form',
+        'Enter a name for the new exercise',
         async (name) => {
           if (!name?.trim()) return;
-          const newDef: FormDefinition = {
+          const newDef: ExerciseDef = {
             id: randomUUID(),
             name: name.trim(),
             params: draft,
           };
-          await saveFormDefinitionToDb(newDef);
-          setFormDefs((prev) => [...prev, newDef]);
+          await saveExerciseDefToDb(newDef);
+          setExerciseDefs((prev) => [...prev, newDef]);
           setActiveId(newDef.id);
           setIsEditMode(false);
         },
@@ -168,22 +168,22 @@ export function EntryForm({ onBack, entryCount = 0, onLogThrow }: EntryFormProps
         name={activeDef.name}
         isEditMode={isEditMode}
         onEditPress={enterEdit}
-        onRenamePress={handleRenameForm}
+        onRenamePress={handleRenameExercise}
         onBack={onBack}
       />
 
       {!isEditMode && (
-        <FormTabs defs={formDefs} activeId={activeId!} onSelect={setActiveId} onAdd={handleAddForm} />
+        <FormTabs defs={exerciseDefs} activeId={activeId!} onSelect={setActiveId} onAdd={handleAddExercise} />
       )}
 
       {isEditMode ? (
         <EditModeContent
           key={editKey}
           formDef={activeDef}
-          paramLibrary={paramLibrary}
-          onAddToLibrary={(param: ScalarParam | NamedParam) =>
-            setParamLibrary((prev) =>
-              prev.some((p) => p.id === param.id) ? prev : [...prev, param],
+          statLibrary={statLibrary}
+          onAddToLibrary={(stat: NumberStatDef | ChoiceStatDef) =>
+            setStatLibrary((prev) =>
+              prev.some((p) => p.id === stat.id) ? prev : [...prev, stat],
             )
           }
           onOverwrite={handleOverwrite}
@@ -208,11 +208,11 @@ export function EntryForm({ onBack, entryCount = 0, onLogThrow }: EntryFormProps
 // Keyed by activeId so form values reset when switching forms.
 
 interface ViewModeProps {
-  formDef: FormDefinition;
+  formDef: ExerciseDef;
   entryCount: number;
   onLogThrow?: EntryFormProps['onLogThrow'];
-  stickyValues: Record<string, ParamValue>;
-  onStickyChange: (paramId: string, value: ParamValue | undefined) => void;
+  stickyValues: Record<string, StatValue>;
+  onStickyChange: (statId: string, value: StatValue | undefined) => void;
 }
 
 function ViewModeContent({ formDef, entryCount, onLogThrow, stickyValues, onStickyChange }: ViewModeProps) {
@@ -229,20 +229,20 @@ function ViewModeContent({ formDef, entryCount, onLogThrow, stickyValues, onStic
   }, []);
 
   const wrapCommit = useCallback(
-    (paramId: string, value: string) => {
+    (statId: string, value: string) => {
       scrollRef.current?.setNativeProps({ scrollEnabled: true });
-      form.setValue(paramId, value);
-      const param = formDef.params.find((p) => p.id === paramId);
-      if (param?.clearAfterSubmit === false) onStickyChange(paramId, value);
+      form.setValue(statId, value);
+      const stat = formDef.params.find((p) => p.id === statId);
+      if (stat?.clearAfterSubmit === false) onStickyChange(statId, value);
     },
     [form, formDef.params, onStickyChange],
   );
 
   const wrapClear = useCallback(
-    (paramId: string) => {
-      form.clearValue(paramId);
-      const param = formDef.params.find((p) => p.id === paramId);
-      if (param?.clearAfterSubmit === false) onStickyChange(paramId, undefined);
+    (statId: string) => {
+      form.clearValue(statId);
+      const stat = formDef.params.find((p) => p.id === statId);
+      if (stat?.clearAfterSubmit === false) onStickyChange(statId, undefined);
     },
     [form, formDef.params, onStickyChange],
   );
@@ -262,15 +262,15 @@ function ViewModeContent({ formDef, entryCount, onLogThrow, stickyValues, onStic
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {form.params.map((param) => (
+        {form.stats.map((stat) => (
           <ParamRow
-            key={param.id}
-            param={param}
-            value={form.values[param.id]}
-            isExpanded={form.expandedIds.has(param.id)}
-            onToggle={() => form.toggleExpanded(param.id)}
-            onCommit={(v) => wrapCommit(param.id, v)}
-            onClear={() => wrapClear(param.id)}
+            key={stat.id}
+            param={stat}
+            value={form.values[stat.id]}
+            isExpanded={form.expandedIds.has(stat.id)}
+            onToggle={() => form.toggleExpanded(stat.id)}
+            onCommit={(v) => wrapCommit(stat.id, v)}
+            onClear={() => wrapClear(stat.id)}
             formatValue={form.formatValue}
             onDragStart={handleDragStart}
           />
@@ -292,17 +292,17 @@ type DragState = {
 };
 
 interface EditModeProps {
-  formDef: FormDefinition;
-  paramLibrary: (ScalarParam | NamedParam)[];
-  onAddToLibrary: (param: ScalarParam | NamedParam) => void;
-  onOverwrite: (draft: Param[]) => void;
-  onSaveAsNew: (draft: Param[]) => void;
+  formDef: ExerciseDef;
+  statLibrary: (NumberStatDef | ChoiceStatDef)[];
+  onAddToLibrary: (stat: NumberStatDef | ChoiceStatDef) => void;
+  onOverwrite: (draft: StatDef[]) => void;
+  onSaveAsNew: (draft: StatDef[]) => void;
   onCancel: () => void;
 }
 
 function EditModeContent({
   formDef,
-  paramLibrary,
+  statLibrary,
   onAddToLibrary,
   onOverwrite,
   onSaveAsNew,
@@ -486,12 +486,12 @@ function EditModeContent({
       <ParamSettingsSheet
         visible={sheetVisible}
         initial={sheetTarget}
-        onSave={async (param) => {
-          const isNewParam = edit.settingsTarget === 'new';
-          await saveParamToDb(param).catch(console.error);
-          edit.saveParam(param);
-          if (isNewParam && (param.type === 'scalar' || param.type === 'named')) {
-            onAddToLibrary(param as ScalarParam | NamedParam);
+        onSave={async (stat) => {
+          const isNewStat = edit.settingsTarget === 'new';
+          await saveStatToDb(stat).catch(console.error);
+          edit.saveParam(stat);
+          if (isNewStat && (stat.type === 'scalar' || stat.type === 'named')) {
+            onAddToLibrary(stat as NumberStatDef | ChoiceStatDef);
           }
         }}
         onDisband={() => {
@@ -503,9 +503,9 @@ function EditModeContent({
 
       <AddParamSheet
         visible={showAddSheet}
-        available={paramLibrary.filter((p) => !getParamIdsInDraft(edit.draft).has(p.id))}
-        onAdd={(param) => {
-          edit.saveParam(param);
+        available={statLibrary.filter((p) => !getParamIdsInDraft(edit.draft).has(p.id))}
+        onAdd={(stat) => {
+          edit.saveParam(stat);
           setShowAddSheet(false);
         }}
         onCreateNew={() => {
@@ -521,7 +521,7 @@ function EditModeContent({
 // ─── Form layout tab strip ────────────────────────────────────────────────────
 
 interface FormTabsProps {
-  defs: FormDefinition[];
+  defs: ExerciseDef[];
   activeId: string;
   onSelect: (id: string | null) => void;
   onAdd: () => void;
