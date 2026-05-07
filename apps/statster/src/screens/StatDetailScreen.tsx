@@ -376,7 +376,6 @@ function ChoiceStatCard({ param, options, entries, expanded, onExpand, onCollaps
 
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const withData = options
-    .filter((o) => (counts[o.id] ?? 0) > 0)
     .sort((a, b) => (counts[b.id] ?? 0) - (counts[a.id] ?? 0));
 
   if (withData.length === 0) return null;
