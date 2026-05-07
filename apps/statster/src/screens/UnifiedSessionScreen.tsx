@@ -19,7 +19,10 @@ import { createEntry, deleteEntry, updateEntryExerciseId } from '../db/entries';
 import { insertDatapoints, deleteDatapointsForEntry } from '../db/datapoints';
 import { upsertChoiceOption } from '../db/parameters';
 import { loadExerciseDefs } from '../db/mappers';
-import { queryRichEntries, queryRecentChoiceOptions } from '../db/queries';
+import { queryRichEntries, queryRecentChoiceOptions, queryEntries, queryEntryCountByExercise } from '../db/queries';
+import { getLevels } from '../db/levels';
+import type { Level } from '../db/levels';
+import { computeLevel } from '../utils/levels';
 import { randomUUID } from 'expo-crypto';
 import { FittingPills, type PillItem } from '../components/session/FittingPills';
 import { StatRow, type StatRowDef } from '../components/session/StatRow';
@@ -299,6 +302,9 @@ export function UnifiedSessionScreen({ route, navigation }: Props) {
   const [allStatLibrary, setAllStatLibrary] = useState<StatRowDef[]>([]);
   const [dbRecentOptions, setDbRecentOptions] = useState<Record<string, string[]>>({});
 
+  // ── Saved levels (for level-up detection) ──────────────────────────────────
+  const [savedLevels, setSavedLevels] = useState<Level[]>([]);
+
   // ── Draft and edit state ────────────────────────────────────────────────────
   const draft = useEntryDraft(exercises, dbRecentOptions);
   const editDraft = useEntryDraft(exercises, dbRecentOptions);
@@ -377,11 +383,13 @@ export function UnifiedSessionScreen({ route, navigation }: Props) {
   }, [existingSessionId, initDraftExercise, setDraftExerciseOrder, setEditExerciseOrder]);
 
   useEffect(() => { loadExercises().catch(console.error); }, [loadExercises]);
+  useEffect(() => { getLevels().then(setSavedLevels).catch(console.error); }, []);
 
   useEffect(() => navigation.addListener('focus', () => {
     const autoSelectId = pendingNewExerciseIdRef.current ?? undefined;
     pendingNewExerciseIdRef.current = null;
     loadExercises(autoSelectId).catch(console.error);
+    getLevels().then(setSavedLevels).catch(console.error);
   }), [navigation, loadExercises]);
 
   // ── Load existing session ───────────────────────────────────────────────────
@@ -623,7 +631,42 @@ export function UnifiedSessionScreen({ route, navigation }: Props) {
     setTimeout(() => feedScrollRef.current?.scrollToEnd({ animated: true }), 50);
 
     draft.clearSubmitted();
-  }, [draft, feed.length, sessionName]);
+
+    // ── Level-up detection ────────────────────────────────────────────────────
+    const exerciseId = draft.exerciseId;
+    const exerciseName = draft.activeExercise?.name ?? '';
+
+    // Check custom saved levels first (most specific)
+    let levelUpParams: { levelId?: string; exerciseId?: string; exerciseName?: string } | null = null;
+    for (const lv of savedLevels) {
+      if (lv.filters.length === 0) continue;
+      const matches = lv.filters.every((f) =>
+        namedToInsert.some((dp) => dp.statId === f.statId && dp.optionId === f.optionId),
+      );
+      if (!matches) continue;
+      const lvEntries = await queryEntries({
+        choiceFilters: lv.filters.map((f) => ({ statId: f.statId, optionIds: [f.optionId] })),
+      });
+      const countAfter = lvEntries.length;
+      if (computeLevel(countAfter).level > computeLevel(countAfter - 1).level) {
+        levelUpParams = { levelId: lv.id };
+        break;
+      }
+    }
+
+    // Check exercise auto-level if no custom level-up found
+    if (!levelUpParams) {
+      const exerciseCounts = await queryEntryCountByExercise();
+      const countAfter = exerciseCounts[exerciseId] ?? 1;
+      if (computeLevel(countAfter).level > computeLevel(countAfter - 1).level) {
+        levelUpParams = { exerciseId, exerciseName };
+      }
+    }
+
+    if (levelUpParams) {
+      navigation.navigate('LevelCelebration', levelUpParams);
+    }
+  }, [draft, feed.length, sessionName, savedLevels, navigation]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (

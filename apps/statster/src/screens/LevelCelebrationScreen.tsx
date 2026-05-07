@@ -7,19 +7,19 @@ import type { RootStackParamList } from '../navigation/types';
 import { Colors, Radius, Spacing, Typography, hairline } from '../constants/theme';
 import { useInterest } from '../contexts/InterestContext';
 import { getLevels } from '../db/levels';
-import type { Level } from '../db/levels';
-import { queryEntries } from '../db/queries';
+import { queryEntries, queryEntryCountByExercise } from '../db/queries';
 import { computeLevel } from '../utils/levels';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LevelCelebration'>;
 
 export function LevelCelebrationScreen({ navigation, route }: Props) {
-  const { levelId } = route.params;
+  const { levelId, exerciseId, exerciseName: exerciseNameParam } = route.params;
   const insets = useSafeAreaInsets();
   const { activeInterest } = useInterest();
   const color = activeInterest?.color ?? Colors.primary;
 
-  const [level, setLevel] = useState<Level | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [filterChips, setFilterChips] = useState<string[]>([]);
   const [entryCount, setEntryCount] = useState<number | null>(null);
   const [displayLevel, setDisplayLevel] = useState(0);
 
@@ -28,17 +28,24 @@ export function LevelCelebrationScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     async function load() {
-      const levels = await getLevels();
-      const found = levels.find((l) => l.id === levelId);
-      if (!found) return;
-      setLevel(found);
-      const entries = await queryEntries({
-        choiceFilters: found.filters.map((f) => ({ statId: f.statId, optionIds: [f.optionId] })),
-      });
-      setEntryCount(entries.length);
+      if (levelId) {
+        const levels = await getLevels();
+        const found = levels.find((l) => l.id === levelId);
+        if (!found) return;
+        setDisplayName(found.name);
+        setFilterChips(found.filters.map((f) => f.optionLabel));
+        const entries = await queryEntries({
+          choiceFilters: found.filters.map((f) => ({ statId: f.statId, optionIds: [f.optionId] })),
+        });
+        setEntryCount(entries.length);
+      } else if (exerciseId) {
+        setDisplayName(exerciseNameParam ?? '');
+        const counts = await queryEntryCountByExercise();
+        setEntryCount(counts[exerciseId] ?? 0);
+      }
     }
     load().catch(console.error);
-  }, [levelId]);
+  }, [levelId, exerciseId, exerciseNameParam]);
 
   useEffect(() => {
     if (entryCount === null) return;
@@ -97,16 +104,16 @@ export function LevelCelebrationScreen({ navigation, route }: Props) {
         </View>
 
         {/* Name */}
-        {level && (
-          <Text style={styles.levelName}>{level.name}</Text>
+        {displayName && (
+          <Text style={styles.levelName}>{displayName}</Text>
         )}
 
         {/* Filter chips */}
-        {level && level.filters.length > 0 && (
+        {filterChips.length > 0 && (
           <View style={styles.chipRow}>
-            {level.filters.map((f) => (
-              <View key={f.statId} style={[styles.chip, { backgroundColor: color + '18', borderColor: color + '38' }]}>
-                <Text style={[styles.chipText, { color }]}>{f.optionLabel}</Text>
+            {filterChips.map((label) => (
+              <View key={label} style={[styles.chip, { backgroundColor: color + '18', borderColor: color + '38' }]}>
+                <Text style={[styles.chipText, { color }]}>{label}</Text>
               </View>
             ))}
           </View>
