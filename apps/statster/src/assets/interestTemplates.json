@@ -1,0 +1,23 @@
+[
+  {
+    "id": "disc_golf",
+    "name": "Disc Golf",
+    "emoji": "🥏",
+    "color": "#0C447C",
+    "description": "Throws, putts, and disc selection"
+  },
+  {
+    "id": "guitar",
+    "name": "Guitar",
+    "emoji": "🎸",
+    "color": "#7C3A0C",
+    "description": "Practice sessions and technique"
+  },
+  {
+    "id": "workout",
+    "name": "Workout",
+    "emoji": "💪",
+    "color": "#1A6B2E",
+    "description": "Reps, sets, and weights"
+  }
+]

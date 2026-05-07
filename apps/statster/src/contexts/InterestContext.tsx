@@ -13,10 +13,6 @@ export type Interest = {
   dbFile: string;
 };
 
-const DEFAULT_INTERESTS: Interest[] = [
-  { id: 'disc_golf', name: 'Disc Golf', emoji: '🥏', color: '#0C447C', dbFile: 'disc_golf.db' },
-];
-
 type InterestContextValue = {
   interests: Interest[];
   activeInterest: Interest;
@@ -36,13 +32,13 @@ export function InterestProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function init() {
       try {
-        let allInterests = await metaDb.getAllInterests();
+        const allInterests = await metaDb.getAllInterests();
 
         if (allInterests.length === 0) {
-          for (const interest of DEFAULT_INTERESTS) {
-            await metaDb.insertInterest(interest);
-          }
-          allInterests = DEFAULT_INTERESTS;
+          // First run — no interests yet; show creation screen.
+          setInterests([]);
+          setReady(true);
+          return;
         }
 
         const savedId = await metaDb.getActiveInterestId();
@@ -64,7 +60,7 @@ export function InterestProvider({ children }: { children: React.ReactNode }) {
     init();
   }, []);
 
-  const activeInterest = interests.find((i) => i.id === activeId) ?? interests[0];
+  const activeInterest = (interests.find((i) => i.id === activeId) ?? interests[0]) as Interest;
 
   const switchInterest = useCallback(
     async (id: string) => {
@@ -97,7 +93,7 @@ export function InterestProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!ready || !activeInterest) {
+  if (!ready) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={Colors.primary} />
