@@ -131,6 +131,17 @@ export async function queryRichEntries(filters: EntryQueryFilters): Promise<Rich
   }));
 }
 
+// ── Entry counts per exercise ─────────────────────────────────────────────────
+
+export async function queryEntryCountByExercise(): Promise<Record<string, number>> {
+  const rows = await getInterestDb().getAllAsync<{ form_id: string; count: number }>(
+    'SELECT form_id, COUNT(*) AS count FROM entry GROUP BY form_id',
+  );
+  const result: Record<string, number> = {};
+  for (const r of rows) result[r.form_id] = r.count;
+  return result;
+}
+
 // ── Stat usage counts ─────────────────────────────────────────────────────────
 
 export async function queryStatUsageCounts(): Promise<Record<string, number>> {

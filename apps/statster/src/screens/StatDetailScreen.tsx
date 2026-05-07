@@ -18,7 +18,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { Ionicons } from '@expo/vector-icons';
 import Svg, { Rect } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
@@ -60,9 +59,12 @@ interface SummaryCardProps {
   entryCount: number | null;
   filters: ActiveFilter[];
   onRemoveFilter: (f: ActiveFilter) => void;
+  isAlreadySaved: boolean;
+  canSave: boolean;
+  onSave: () => void;
 }
 
-function SummaryCard({ entryCount, filters, onRemoveFilter }: SummaryCardProps) {
+function SummaryCard({ entryCount, filters, onRemoveFilter, isAlreadySaved, canSave, onSave }: SummaryCardProps) {
   return (
     <View style={summary.card}>
       <View style={summary.chipRow}>
@@ -79,11 +81,21 @@ function SummaryCard({ entryCount, filters, onRemoveFilter }: SummaryCardProps) 
           </ScrollView>
         )}
       </View>
-      {entryCount !== null ? (
-        <Text style={summary.entryCount}>{entryCount} {entryCount === 1 ? 'entry' : 'entries'}</Text>
-      ) : (
-        <ActivityIndicator color={Colors.primary} style={{ marginVertical: Spacing.sm }} />
-      )}
+      <View style={summary.bottom}>
+        {entryCount !== null ? (
+          <Text style={summary.entryCount}>{entryCount} {entryCount === 1 ? 'entry' : 'entries'}</Text>
+        ) : (
+          <ActivityIndicator color={Colors.primary} />
+        )}
+        {canSave && (
+          <TouchableOpacity style={[summary.saveBtn, isAlreadySaved && summary.saveBtnSaved]} onPress={onSave} activeOpacity={0.7}>
+            <Feather name="star" size={12} color={isAlreadySaved ? '#F5A623' : Colors.primary} />
+            <Text style={[summary.saveBtnText, isAlreadySaved && summary.saveBtnTextSaved]}>
+              {isAlreadySaved ? 'Saved' : 'Save as level'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
@@ -100,7 +112,17 @@ const summary = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.primaryBorder,
   },
   chipText: { ...Typography.labelSm, color: Colors.primary, fontWeight: '600' },
+  bottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   entryCount: { ...Typography.label, color: Colors.textMuted },
+  saveBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: Colors.primaryLight, borderRadius: Radius.pill,
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs,
+    borderWidth: 1, borderColor: Colors.primaryBorder,
+  },
+  saveBtnSaved: { backgroundColor: '#FFF8EC', borderColor: '#F5A62340' },
+  saveBtnText: { ...Typography.labelSm, color: Colors.primary, fontWeight: '600' },
+  saveBtnTextSaved: { color: '#F5A623' },
 });
 
 // ── Shared card primitives ────────────────────────────────────────────────────
@@ -577,24 +599,10 @@ export function StatDetailScreen({ navigation, route }: Props) {
     .filter((p) => !filteredStatIds.has(p.id))
     .sort((a, b) => (statEntryCount[b.id] ?? 0) - (statEntryCount[a.id] ?? 0));
 
-  const starElement = (
-    <TouchableOpacity
-      onPress={handleStarPress}
-      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      disabled={choiceFilters.length === 0}
-    >
-      <Ionicons
-        name={existingLevel ? 'star' : 'star-outline'}
-        size={22}
-        color={choiceFilters.length === 0 ? Colors.textDisabled : existingLevel ? '#F5A623' : Colors.textMuted}
-      />
-    </TouchableOpacity>
-  );
-
   if (initialLoading) {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
-        <ScreenHeader title="Stats" onBack={() => navigation.goBack()} rightElement={starElement} />
+        <ScreenHeader title="Stats" onBack={() => navigation.goBack()} />
         <ActivityIndicator color={Colors.primary} style={{ flex: 1 }} />
       </View>
     );
@@ -602,13 +610,20 @@ export function StatDetailScreen({ navigation, route }: Props) {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Stats" onBack={() => navigation.goBack()} rightElement={starElement} />
+      <ScreenHeader title="Stats" onBack={() => navigation.goBack()} />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.xl }]}
         showsVerticalScrollIndicator={false}
       >
-        <SummaryCard entryCount={entryCount} filters={filters} onRemoveFilter={removeFilter} />
+        <SummaryCard
+          entryCount={entryCount}
+          filters={filters}
+          onRemoveFilter={removeFilter}
+          canSave={choiceFilters.length > 0}
+          isAlreadySaved={!!existingLevel}
+          onSave={handleStarPress}
+        />
 
         {sortedChoice.map((param) => {
           const options = allOptions.filter((o) => o.statId === param.id && o.archivedAt === null);

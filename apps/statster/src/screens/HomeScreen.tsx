@@ -17,66 +17,135 @@ import { InterestSwitcherSheet } from '../components/InterestSwitcher/InterestSw
 import type { SessionSummary } from '../db/types';
 import { getSessionsWithEntryCounts } from '../db/sessions';
 import { getLevels } from '../db/levels';
-import type { Level } from '../db/levels';
-import { queryEntries } from '../db/queries';
+import type { LevelFilter } from '../db/levels';
+import { getExercises } from '../db/forms';
+import { queryEntries, queryEntryCountByExercise } from '../db/queries';
+import { computeLevel } from '../utils/levels';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
-type TrackedItem = Level & { entryCount: number };
+type DisplayLevel = {
+  id: string;
+  name: string;
+  kind: 'exercise' | 'custom';
+  entryCount: number;
+  level: number;
+  progress: number;
+  toNext: number;
+  isMax: boolean;
+  filters: LevelFilter[];
+};
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-SE', { month: 'short', day: 'numeric' });
 }
 
+function LevelCard({
+  name, kind, level, progress, toNext, isMax, accentColor,
+}: {
+  name: string; kind: 'overall' | 'exercise' | 'custom';
+  level: number; progress: number; toNext: number; isMax: boolean;
+  accentColor: string;
+}) {
+  return (
+    <View style={card.root}>
+      <View style={card.top}>
+        <Text style={card.name} numberOfLines={1}>{name}</Text>
+        {kind === 'custom' && (
+          <Feather name="star" size={11} color={accentColor} />
+        )}
+      </View>
+      <Text style={[card.levelNum, { color: accentColor }]}>{level}</Text>
+      <View style={card.barTrack}>
+        <View style={[card.barFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: accentColor }]} />
+      </View>
+      <Text style={card.sub}>
+        {isMax ? 'Max level' : `${toNext} to level ${level + 1}`}
+      </Text>
+    </View>
+  );
+}
+
+const card = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    gap: 6,
+  },
+  top: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  name: { ...Typography.labelSm, color: Colors.textMuted, fontWeight: '600', flex: 1 },
+  levelNum: { fontSize: 32, fontWeight: '800', lineHeight: 36 },
+  barTrack: { height: 4, borderRadius: 2, backgroundColor: Colors.separator, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: 2 },
+  sub: { ...Typography.labelSm, color: Colors.textDisabled },
+});
 
 export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { activeInterest, addInterest } = useInterest();
+  const accentColor = activeInterest.color;
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [overallCount, setOverallCount] = useState<number | null>(null);
-  const [tracked, setTracked] = useState<TrackedItem[]>([]);
+  const [overallLevel, setOverallLevel] = useState({ level: 1, progress: 0, toNext: 25, isMax: false });
+  const [displayLevels, setDisplayLevels] = useState<DisplayLevel[]>([]);
 
   const loadData = useCallback(async () => {
-    const [allEntries, levels, sessionList] = await Promise.all([
+    const [allEntries, exercises, exerciseCounts, customLevels, sessionList] = await Promise.all([
       queryEntries({}),
+      getExercises(),
+      queryEntryCountByExercise(),
       getLevels(),
       getSessionsWithEntryCounts(),
     ]);
 
-    const top4 = levels.slice(0, 4);
-    const counts = await Promise.all(
-      top4.map((level) =>
-        queryEntries({
-          choiceFilters: level.filters.map((f) => ({ statId: f.statId, optionIds: [f.optionId] })),
-        }).then((entries) => entries.length),
-      ),
+    const overall = allEntries.length;
+    setOverallCount(overall);
+    setOverallLevel(computeLevel(overall));
+
+    // Custom level entry counts
+    const customWithCounts = await Promise.all(
+      customLevels.map(async (lv) => {
+        const entries = await queryEntries({
+          choiceFilters: lv.filters.map((f) => ({ statId: f.statId, optionIds: [f.optionId] })),
+        });
+        return { ...lv, entryCount: entries.length };
+      }),
     );
 
-    setOverallCount(allEntries.length);
-    setTracked(top4.map((level, i) => ({ ...level, entryCount: counts[i] })));
+    // Exercise auto-levels (only exercises with ≥1 entry)
+    const exerciseLevels: DisplayLevel[] = exercises
+      .filter((e) => (exerciseCounts[e.id] ?? 0) > 0)
+      .map((e) => {
+        const count = exerciseCounts[e.id];
+        return { id: e.id, name: e.name, kind: 'exercise' as const, entryCount: count, filters: [], ...computeLevel(count) };
+      });
+
+    const customDisplay: DisplayLevel[] = customWithCounts.map((lv) => ({
+      id: lv.id, name: lv.name, kind: 'custom' as const,
+      entryCount: lv.entryCount, filters: lv.filters,
+      ...computeLevel(lv.entryCount),
+    }));
+
+    const sorted = [...exerciseLevels, ...customDisplay].sort((a, b) => a.toNext - b.toNext);
+    setDisplayLevels(sorted);
     setSessions(sessionList);
   }, []);
 
-  useEffect(() => {
-    loadData().catch(console.error);
-  }, [loadData]);
+  useEffect(() => { loadData().catch(console.error); }, [loadData]);
+  useEffect(() => navigation.addListener('focus', () => loadData().catch(console.error)), [navigation, loadData]);
 
-  useEffect(() => {
-    return navigation.addListener('focus', () => loadData().catch(console.error));
-  }, [navigation, loadData]);
+  const top4 = displayLevels.slice(0, 4);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.interestButton}
-          onPress={() => setSwitcherOpen(true)}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity style={styles.interestButton} onPress={() => setSwitcherOpen(true)} activeOpacity={0.7}>
           <Text style={styles.interestEmoji}>{activeInterest.emoji}</Text>
-          <Text style={[styles.appTitle, { color: activeInterest.color }]}>{activeInterest.name}</Text>
-          <Feather name="chevron-down" size={18} color={activeInterest.color} style={styles.chevron} />
+          <Text style={[styles.appTitle, { color: accentColor }]}>{activeInterest.name}</Text>
+          <Feather name="chevron-down" size={18} color={accentColor} style={styles.chevron} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('Exercises')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="settings" size={20} color={Colors.textMuted} />
@@ -88,15 +157,10 @@ export function HomeScreen({ navigation }: Props) {
         onClose={() => setSwitcherOpen(false)}
         onAddInterest={() => {
           setSwitcherOpen(false);
-          Alert.prompt(
-            'New interest',
-            'Enter a name (e.g. "Guitar", "Gym")',
-            async (name) => {
-              if (!name?.trim()) return;
-              await addInterest({ name: name.trim(), emoji: '🏆', color: '#0C447C' });
-            },
-            'plain-text',
-          );
+          Alert.prompt('New interest', 'Enter a name (e.g. "Guitar", "Gym")', async (name) => {
+            if (!name?.trim()) return;
+            await addInterest({ name: name.trim(), emoji: '🏆', color: '#0C447C' });
+          }, 'plain-text');
         }}
       />
 
@@ -105,55 +169,62 @@ export function HomeScreen({ navigation }: Props) {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Overall — always shown */}
-        <TouchableOpacity
-          activeOpacity={0.75}
-          style={styles.overallCard}
-          onPress={() => navigation.navigate('StatDetail', { filters: [] })}
-        >
-          <Text style={styles.sectionLabel}>OVERALL</Text>
-          <Text style={styles.overallCount}>
-            {overallCount !== null ? overallCount : '—'}
-          </Text>
-          <Text style={styles.levelSubtext}>total entries</Text>
+        {/* Overall card — full width, bigger */}
+        <TouchableOpacity activeOpacity={0.75} onPress={() => navigation.navigate('Levels')}>
+          <View style={styles.overallCard}>
+            <Text style={styles.sectionLabel}>OVERALL</Text>
+            <Text style={[styles.overallNum, { color: accentColor }]}>
+              {overallCount !== null ? overallCount : '—'}
+            </Text>
+            <View style={styles.overallBarTrack}>
+              <View style={[styles.overallBarFill, { width: `${Math.round(overallLevel.progress * 100)}%`, backgroundColor: accentColor }]} />
+            </View>
+            <Text style={styles.overallSub}>
+              Level {overallLevel.level}
+              {overallLevel.isMax ? ' · Max level' : ` · ${overallLevel.toNext} to level ${overallLevel.level + 1}`}
+            </Text>
+          </View>
         </TouchableOpacity>
 
-        {/* Tracked levels */}
-        <View style={styles.trackedCard}>
-          <View style={styles.trackedHeader}>
-            <Text style={styles.sectionLabel}>TRACKED</Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Levels')}
-              style={styles.manageBtn}
-            >
-              <Text style={styles.manageBtnText}>Manage</Text>
-              <Feather name="chevron-right" size={14} color={Colors.primary} />
-            </TouchableOpacity>
-          </View>
-
-          {tracked.length === 0 ? (
-            <Text style={styles.emptyTracked}>
-              No tracked levels yet. Open Stats, set a filter, and tap the bookmark icon to save one.
-            </Text>
-          ) : (
-            <View style={styles.trackedGrid}>
-              {tracked.map((item) => (
+        {/* Level cards grid */}
+        {(top4.length > 0 || true) && (
+          <TouchableOpacity activeOpacity={1} onPress={() => navigation.navigate('Levels')}>
+            <View style={styles.grid}>
+              {top4.map((lv) => (
                 <TouchableOpacity
-                  key={item.id}
+                  key={lv.id}
+                  style={styles.gridCell}
                   activeOpacity={0.75}
-                  style={styles.trackedItem}
-                  onPress={() => navigation.navigate('StatDetail', { filters: item.filters })}
+                  onPress={() => navigation.navigate('Levels')}
                 >
-                  <Text style={styles.trackedName}>{item.name}</Text>
-                  <Text style={styles.trackedLevel}>{item.entryCount}</Text>
-                  <Text style={styles.levelSubtext}>entries</Text>
+                  <LevelCard
+                    name={lv.name}
+                    kind={lv.kind}
+                    level={lv.level}
+                    progress={lv.progress}
+                    toNext={lv.toNext}
+                    isMax={lv.isMax}
+                    accentColor={accentColor}
+                  />
                 </TouchableOpacity>
               ))}
-            </View>
-          )}
-        </View>
 
-        {/* Recent sessions */}
+              {/* Ghost "Add level" card */}
+              <TouchableOpacity
+                style={styles.gridCell}
+                activeOpacity={0.75}
+                onPress={() => navigation.navigate('StatDetail', {})}
+              >
+                <View style={styles.addCard}>
+                  <Feather name="plus" size={20} color={Colors.textDisabled} />
+                  <Text style={styles.addCardText}>Add level</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Sessions */}
         <Text style={styles.sectionTitle}>Recent sessions</Text>
 
         {sessions.length === 0 && (
@@ -168,7 +239,7 @@ export function HomeScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('UnifiedSession', { sessionId: session.id })}
           >
             <View style={styles.sessionCardLeft}>
-              <Text style={styles.sessionCourse}>{session.name ?? 'Session'}</Text>
+              <Text style={styles.sessionName}>{session.name ?? 'Session'}</Text>
               <Text style={styles.sessionMeta}>
                 {session.entryCount} {session.entryCount === 1 ? 'throw' : 'throws'}
               </Text>
@@ -181,7 +252,7 @@ export function HomeScreen({ navigation }: Props) {
       {/* Sticky bottom bar */}
       <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
         <TouchableOpacity
-          style={styles.newSessionBtn}
+          style={[styles.newSessionBtn, { backgroundColor: accentColor }]}
           activeOpacity={0.8}
           onPress={() => navigation.navigate('UnifiedSession')}
         >
@@ -203,109 +274,61 @@ const styles = StyleSheet.create({
     borderBottomWidth: hairline,
     borderBottomColor: Colors.separator,
   },
-  interestButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    alignSelf: 'flex-start',
-  },
+  interestButton: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, alignSelf: 'flex-start' },
   interestEmoji: { fontSize: 20 },
   appTitle: { fontSize: 22, fontWeight: '700', letterSpacing: -0.3 },
   chevron: { marginTop: 2 },
   scroll: { flex: 1 },
-  scrollContent: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
-    gap: Spacing.md,
+  scrollContent: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, gap: Spacing.md },
+  sectionLabel: {
+    ...Typography.labelSm, color: Colors.textMuted, fontWeight: '600',
+    letterSpacing: 0.5, textTransform: 'uppercase',
   },
   // Overall card
   overallCard: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.lg,
-    gap: Spacing.md,
+    gap: Spacing.sm,
   },
-  sectionLabel: {
-    ...Typography.labelSm,
-    color: Colors.textMuted,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  overallCount: {
-    fontSize: 52,
-    fontWeight: '700',
-    color: Colors.primary,
-    lineHeight: 56,
-  },
-  levelSubtext: { ...Typography.labelSm, color: Colors.textMuted },
-  // Tracked card
-  trackedCard: {
+  overallNum: { fontSize: 56, fontWeight: '800', lineHeight: 60 },
+  overallBarTrack: { height: 6, borderRadius: 3, backgroundColor: Colors.separator, overflow: 'hidden' },
+  overallBarFill: { height: '100%', borderRadius: 3 },
+  overallSub: { ...Typography.labelSm, color: Colors.textMuted },
+  // Grid
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
+  gridCell: { width: '47%' },
+  addCard: {
+    flex: 1,
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
-    padding: Spacing.lg,
-    gap: Spacing.md,
-  },
-  trackedHeader: {
-    flexDirection: 'row',
+    borderWidth: 1.5,
+    borderColor: Colors.separator,
+    borderStyle: 'dashed',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    paddingVertical: Spacing.xl,
+    gap: Spacing.sm,
+    minHeight: 110,
   },
-  manageBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  manageBtnText: { ...Typography.labelSm, color: Colors.primary, fontWeight: '600' },
-  trackedGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.md,
-  },
-  trackedItem: {
-    width: '45%',
-    gap: 4,
-  },
-  trackedName: { ...Typography.labelSm, color: Colors.textMuted },
-  trackedLevel: { ...Typography.title, color: Colors.text },
-  emptyTracked: {
-    ...Typography.labelSm,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    paddingVertical: Spacing.md,
-    lineHeight: 18,
-  },
+  addCardText: { ...Typography.labelSm, color: Colors.textDisabled, fontWeight: '600' },
   // Sessions
-  sectionTitle: {
-    ...Typography.title,
-    color: Colors.text,
-    marginTop: Spacing.sm,
-  },
+  sectionTitle: { ...Typography.title, color: Colors.text, marginTop: Spacing.sm },
   sessionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    padding: Spacing.lg,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: Colors.surface, borderRadius: Radius.md, padding: Spacing.lg,
   },
   sessionCardLeft: { flex: 1, gap: 2 },
-  sessionCourse: { ...Typography.body, fontWeight: '600', color: Colors.text },
+  sessionName: { ...Typography.body, fontWeight: '600', color: Colors.text },
   sessionMeta: { ...Typography.labelSm, color: Colors.textMuted },
   sessionDate: { ...Typography.label, color: Colors.textMuted },
-  emptyLabel: {
-    ...Typography.label,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    paddingVertical: Spacing.lg,
-  },
+  emptyLabel: { ...Typography.label, color: Colors.textMuted, textAlign: 'center', paddingVertical: Spacing.lg },
+  // Footer
   stickyBar: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    borderTopWidth: hairline,
-    borderTopColor: Colors.separator,
+    paddingHorizontal: Spacing.lg, paddingTop: Spacing.md,
+    borderTopWidth: hairline, borderTopColor: Colors.separator,
     backgroundColor: Colors.background,
   },
-  newSessionBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
-  },
+  newSessionBtn: { borderRadius: Radius.md, paddingVertical: Spacing.md, alignItems: 'center' },
   newSessionText: { ...Typography.body, color: '#fff', fontWeight: '700' },
 });

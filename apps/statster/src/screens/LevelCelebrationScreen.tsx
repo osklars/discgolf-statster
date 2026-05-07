@@ -9,27 +9,9 @@ import { useInterest } from '../contexts/InterestContext';
 import { getLevels } from '../db/levels';
 import type { Level } from '../db/levels';
 import { queryEntries } from '../db/queries';
+import { computeLevel } from '../utils/levels';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LevelCelebration'>;
-
-const THRESHOLDS = [0, 25, 75, 150, 300, 500, 1000, 2000, 5000, 10000];
-
-function computeLevel(count: number) {
-  const last = THRESHOLDS.length - 1;
-  if (count >= THRESHOLDS[last]) {
-    return { level: last + 1, progress: 1, toNext: 0, isMax: true };
-  }
-  let i = 0;
-  while (i < last - 1 && count >= THRESHOLDS[i + 1]) i++;
-  const current = THRESHOLDS[i];
-  const next = THRESHOLDS[i + 1];
-  return {
-    level: i + 1,
-    progress: (count - current) / (next - current),
-    toNext: next - count,
-    isMax: false,
-  };
-}
 
 export function LevelCelebrationScreen({ navigation, route }: Props) {
   const { levelId } = route.params;
