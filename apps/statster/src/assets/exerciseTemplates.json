@@ -1,0 +1,143 @@
+[
+  {
+    "id": "disc_golf",
+    "name": "Disc Golf",
+    "stats": [
+      {
+        "id": "disc", "name": "Disc", "type": "named",
+        "options": [
+          { "id": "d_destroyer", "label": "Destroyer" },
+          { "id": "d_wraith",    "label": "Wraith"    },
+          { "id": "d_buzzz",     "label": "Buzzz"     },
+          { "id": "d_roc3",      "label": "Roc3"      },
+          { "id": "d_luna",      "label": "Luna"      },
+          { "id": "d_aviar",     "label": "Aviar"     }
+        ]
+      },
+      {
+        "id": "hand", "name": "Hand", "type": "named",
+        "options": [
+          { "id": "hand_bh", "label": "Backhand" },
+          { "id": "hand_fh", "label": "Forehand" }
+        ]
+      },
+      {
+        "id": "shot_shape", "name": "Shot shape", "type": "named",
+        "options": [
+          { "id": "ss_straight", "label": "Straight"    },
+          { "id": "ss_hyzer",    "label": "Hyzer"       },
+          { "id": "ss_ani",      "label": "Anhyzer"     },
+          { "id": "ss_flex",     "label": "Flex"        },
+          { "id": "ss_spike",    "label": "Spike hyzer" },
+          { "id": "ss_grenade",  "label": "Grenade"     },
+          { "id": "ss_tomahawk", "label": "Tomahawk"    },
+          { "id": "ss_roller",   "label": "Roller"      }
+        ]
+      },
+      {
+        "id": "throw_type", "name": "Throw type", "type": "named",
+        "options": [
+          { "id": "tt_real",     "label": "Real"     },
+          { "id": "tt_practice", "label": "Practice" },
+          { "id": "tt_mulligan", "label": "Mulligan" }
+        ]
+      },
+      {
+        "id": "putt_shape", "name": "Putt shape", "type": "named",
+        "options": [
+          { "id": "ps_straight", "label": "Straight" },
+          { "id": "ps_uphill",   "label": "Uphill"   },
+          { "id": "ps_downhill", "label": "Downhill" },
+          { "id": "ps_hyzer",    "label": "Hyzer"    },
+          { "id": "ps_ani",      "label": "Anhyzer"  },
+          { "id": "ps_lofty",    "label": "Lofty"    },
+          { "id": "ps_turbo",    "label": "Turbo"    }
+        ]
+      },
+      {
+        "id": "putt_stance", "name": "Stance", "type": "named",
+        "options": [
+          { "id": "st_staggered",      "label": "Staggered"      },
+          { "id": "st_straddle",       "label": "Straddle"       },
+          { "id": "st_jump",           "label": "Jump"           },
+          { "id": "st_step",           "label": "Step"           },
+          { "id": "st_knee",           "label": "Knee"           },
+          { "id": "st_straddle_left",  "label": "Straddle left"  },
+          { "id": "st_straddle_right", "label": "Straddle right" }
+        ]
+      },
+      {
+        "id": "putt_result", "name": "Result", "type": "named",
+        "options": [
+          { "id": "pr_make",        "label": "Make"        },
+          { "id": "pr_airball",     "label": "Airball"     },
+          { "id": "pr_cage",        "label": "Cage"        },
+          { "id": "pr_band",        "label": "Band"        },
+          { "id": "pr_chain_out",   "label": "Chain-out"   },
+          { "id": "pr_spit_out",    "label": "Spit-out"    },
+          { "id": "pr_cut_through", "label": "Cut-through" }
+        ]
+      },
+      { "id": "diff",           "name": "Difficulty",      "type": "scalar", "min": 1,  "max": 10,  "step": 1,   "majorStep": 1,  "lblMin": "easy",       "lblMax": "hard",       "unit": null, "target": null },
+      { "id": "target_dist",    "name": "Target distance", "type": "scalar", "min": 0,  "max": 160, "step": 5,   "majorStep": 50, "lblMin": "0m",         "lblMax": "160m",       "unit": "m",  "target": null },
+      { "id": "distance",       "name": "Distance",        "type": "scalar", "min": 0,  "max": 160, "step": 5,   "majorStep": 50, "lblMin": "0m",         "lblMax": "160m",       "unit": "m",  "target": null },
+      { "id": "putt_dist",      "name": "Distance",        "type": "scalar", "min": 0,  "max": 30,  "step": 1,   "majorStep": 5,  "lblMin": "0m",         "lblMax": "30m",        "unit": "m",  "target": null },
+      { "id": "grade",          "name": "Grade",           "type": "scalar", "min": 1,  "max": 10,  "step": 1,   "majorStep": 1,  "lblMin": "shank",      "lblMax": "pure",       "unit": null, "target": 10   },
+      { "id": "line",           "name": "Line",            "type": "scalar", "min": -2, "max": 2,   "step": 1,   "majorStep": 1,  "lblMin": "early",      "lblMax": "pulled",     "unit": null, "target": 0    },
+      { "id": "height",         "name": "Height",          "type": "scalar", "min": -2, "max": 2,   "step": 1,   "majorStep": 1,  "lblMin": "too low",    "lblMax": "too high",   "unit": null, "target": 0    },
+      { "id": "release_angle",  "name": "Release angle",   "type": "scalar", "min": -2, "max": 2,   "step": 1,   "majorStep": 1,  "lblMin": "hyzer",      "lblMax": "anhyzer",    "unit": null, "target": 0    },
+      { "id": "flip",           "name": "Flip",            "type": "scalar", "min": -2, "max": 2,   "step": 1,   "majorStep": 1,  "lblMin": "too stable", "lblMax": "too flippy", "unit": null, "target": 0    },
+      { "id": "miss",           "name": "Miss",            "type": "scalar", "min": -2, "max": 2,   "step": 0.5, "majorStep": 1,  "lblMin": "left",       "lblMax": "right",      "unit": "m",  "target": 0    }
+    ],
+    "exercises": [
+      {
+        "id": "throw_detailed",
+        "name": "Throw detailed",
+        "layout": [
+          { "statId": "disc",          "sortOrder": 0,  "clearAfterSubmit": false },
+          { "statId": "shot_shape",    "sortOrder": 1,  "clearAfterSubmit": true  },
+          { "statId": "hand",          "sortOrder": 2,  "clearAfterSubmit": false },
+          { "statId": "target_dist",   "sortOrder": 3,  "clearAfterSubmit": true  },
+          { "statId": "diff",          "sortOrder": 4,  "clearAfterSubmit": true  },
+          { "statId": "grade",         "sortOrder": 5,  "clearAfterSubmit": true  },
+          { "statId": "distance",      "sortOrder": 6,  "clearAfterSubmit": true  },
+          { "statId": "line",          "sortOrder": 7,  "clearAfterSubmit": true  },
+          { "statId": "height",        "sortOrder": 8,  "clearAfterSubmit": true  },
+          { "statId": "release_angle", "sortOrder": 9,  "clearAfterSubmit": true  },
+          { "statId": "flip",          "sortOrder": 10, "clearAfterSubmit": true  },
+          { "statId": "throw_type",    "sortOrder": 11, "clearAfterSubmit": false }
+        ]
+      },
+      {
+        "id": "throw",
+        "name": "Throw",
+        "layout": [
+          { "statId": "disc",       "sortOrder": 0, "clearAfterSubmit": false },
+          { "statId": "shot_shape", "sortOrder": 1, "clearAfterSubmit": true  },
+          { "statId": "hand",       "sortOrder": 2, "clearAfterSubmit": false },
+          { "statId": "grade",      "sortOrder": 3, "clearAfterSubmit": true  }
+        ]
+      },
+      {
+        "id": "putt_detailed",
+        "name": "Putt detailed",
+        "layout": [
+          { "statId": "putt_dist",   "sortOrder": 0, "clearAfterSubmit": true },
+          { "statId": "putt_shape",  "sortOrder": 1, "clearAfterSubmit": true },
+          { "statId": "putt_stance", "sortOrder": 2, "clearAfterSubmit": true },
+          { "statId": "grade",       "sortOrder": 3, "clearAfterSubmit": true },
+          { "statId": "putt_result", "sortOrder": 4, "clearAfterSubmit": true },
+          { "statId": "miss",        "sortOrder": 5, "clearAfterSubmit": true }
+        ]
+      },
+      {
+        "id": "putt",
+        "name": "Putt",
+        "layout": [
+          { "statId": "putt_dist", "sortOrder": 0, "clearAfterSubmit": true },
+          { "statId": "grade",     "sortOrder": 1, "clearAfterSubmit": true }
+        ]
+      }
+    ]
+  }
+]

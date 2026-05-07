@@ -17,8 +17,10 @@ type InterestContextValue = {
   interests: Interest[];
   activeInterest: Interest;
   ready: boolean;
+  justCreated: boolean;
   switchInterest: (id: string) => Promise<void>;
   addInterest: (interest: Omit<Interest, 'id' | 'dbFile'>) => Promise<void>;
+  clearJustCreated: () => void;
 };
 
 const InterestContext = createContext<InterestContextValue | null>(null);
@@ -27,6 +29,7 @@ export function InterestProvider({ children }: { children: React.ReactNode }) {
   const [interests, setInterests] = useState<Interest[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [justCreated, setJustCreated] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,7 +39,6 @@ export function InterestProvider({ children }: { children: React.ReactNode }) {
 
         if (allInterests.length === 0) {
           // First run — no interests yet; show creation screen.
-          setInterests([]);
           setReady(true);
           return;
         }
@@ -82,7 +84,10 @@ export function InterestProvider({ children }: { children: React.ReactNode }) {
     await metaDb.setActiveInterestId(id);
     setInterests((prev) => [...prev, interest]);
     setActiveId(id);
+    setJustCreated(true);
   }, []);
+
+  const clearJustCreated = useCallback(() => setJustCreated(false), []);
 
   if (error) {
     return (
@@ -102,7 +107,7 @@ export function InterestProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <InterestContext.Provider value={{ interests, activeInterest, ready, switchInterest, addInterest }}>
+    <InterestContext.Provider value={{ interests, activeInterest, ready, justCreated, switchInterest, addInterest, clearJustCreated }}>
       {children}
     </InterestContext.Provider>
   );
