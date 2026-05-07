@@ -1,12 +1,16 @@
 import { randomUUID } from 'expo-crypto';
 import { getInterestDb } from './interestDb';
 
+// Runtime shape — names always resolved fresh from DB, never stale.
 export type LevelFilter = {
   statId: string;
   statName: string;
   optionId: string;
   optionLabel: string;
 };
+
+// Persisted shape — IDs only.
+type StoredFilter = { statId: string; optionId: string };
 
 export type Level = {
   id: string;
@@ -22,27 +26,62 @@ type LevelRow = {
   sort_order: number;
 };
 
-function fromRow(row: LevelRow): Level {
-  return {
-    id: row.id,
-    name: row.name,
-    filters: JSON.parse(row.filters) as LevelFilter[],
-    sortOrder: row.sort_order,
-  };
-}
-
 export async function getLevels(): Promise<Level[]> {
   const db = getInterestDb();
   const rows = await db.getAllAsync<LevelRow>(
     'SELECT * FROM saved_level ORDER BY sort_order ASC, created_at ASC',
   );
-  return rows.map(fromRow);
+
+  if (rows.length === 0) return [];
+
+  const allStored: StoredFilter[][] = rows.map((r) => {
+    const raw = JSON.parse(r.filters) as Array<{ statId: string; optionId: string }>;
+    return raw.map((f) => ({ statId: f.statId, optionId: f.optionId }));
+  });
+
+  const statIds = [...new Set(allStored.flat().map((f) => f.statId))];
+  const optionIds = [...new Set(allStored.flat().map((f) => f.optionId))];
+
+  if (statIds.length === 0) {
+    return rows.map((row) => ({ id: row.id, name: row.name, filters: [], sortOrder: row.sort_order }));
+  }
+
+  const pStats = statIds.map(() => '?').join(',');
+  const pOptions = optionIds.map(() => '?').join(',');
+
+  const [statRows, optionRows] = await Promise.all([
+    db.getAllAsync<{ id: string; name: string }>(
+      `SELECT id, name FROM named_parameter WHERE id IN (${pStats})`, statIds,
+    ),
+    db.getAllAsync<{ id: string; label: string }>(
+      `SELECT id, label FROM named_option WHERE id IN (${pOptions})`, optionIds,
+    ),
+  ]);
+
+  const statNames: Record<string, string> = {};
+  for (const s of statRows) statNames[s.id] = s.name;
+  const optionLabels: Record<string, string> = {};
+  for (const o of optionRows) optionLabels[o.id] = o.label;
+
+  return rows.map((row, i) => ({
+    id: row.id,
+    name: row.name,
+    sortOrder: row.sort_order,
+    filters: allStored[i]
+      .filter((f) => f.statId in statNames && f.optionId in optionLabels)
+      .map((f) => ({
+        statId: f.statId,
+        statName: statNames[f.statId],
+        optionId: f.optionId,
+        optionLabel: optionLabels[f.optionId],
+      })),
+  }));
 }
 
 export async function insertLevel(
   name: string,
-  filters: LevelFilter[],
-): Promise<Level> {
+  filters: Array<{ statId: string; optionId: string }>,
+): Promise<string> {
   const db = getInterestDb();
   const id = randomUUID();
   const now = new Date().toISOString();
@@ -50,11 +89,12 @@ export async function insertLevel(
     'SELECT MAX(sort_order) AS max_order FROM saved_level',
   );
   const sortOrder = (maxRow?.max_order ?? -1) + 1;
+  const stored: StoredFilter[] = filters.map((f) => ({ statId: f.statId, optionId: f.optionId }));
   await db.runAsync(
     'INSERT INTO saved_level (id, name, filters, sort_order, created_at) VALUES (?, ?, ?, ?, ?)',
-    [id, name, JSON.stringify(filters), sortOrder, now],
+    [id, name, JSON.stringify(stored), sortOrder, now],
   );
-  return { id, name, filters, sortOrder };
+  return id;
 }
 
 export async function deleteLevel(id: string): Promise<void> {

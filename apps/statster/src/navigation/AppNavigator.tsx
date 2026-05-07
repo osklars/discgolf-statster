@@ -9,6 +9,7 @@ import { ExercisesScreen } from '../screens/ExercisesScreen';
 import { ExerciseEditorScreen } from '../screens/ExerciseEditorScreen';
 import { StatEditorScreen } from '../screens/StatEditorScreen';
 import { ImportExercisesScreen } from '../screens/ImportExercisesScreen';
+import { LevelCelebrationScreen } from '../screens/LevelCelebrationScreen';
 import { Colors } from '../constants/theme';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -36,6 +37,7 @@ export function AppNavigator() {
       <Stack.Screen name="ExerciseEditor" component={ExerciseEditorScreen} options={{ headerShown: false }} />
       <Stack.Screen name="StatEditor" component={StatEditorScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ImportExercises" component={ImportExercisesRoute} options={{ headerShown: false }} />
+      <Stack.Screen name="LevelCelebration" component={LevelCelebrationScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

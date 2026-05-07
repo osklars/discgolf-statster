@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   PanResponder,
   ScrollView,
   StyleSheet,
@@ -17,6 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Rect } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
@@ -26,6 +28,8 @@ import { queryRichEntries } from '../db/queries';
 import type { RichEntry } from '../db/queries';
 import { getNumberStats, getChoiceStats, getAllChoiceOptions } from '../db/parameters';
 import type { NumberStat, ChoiceStat, ChoiceOption } from '../db/types';
+import { getLevels, insertLevel } from '../db/levels';
+import type { Level } from '../db/levels';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StatDetail'>;
 
@@ -449,9 +453,16 @@ const card = StyleSheet.create({
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-export function StatDetailScreen({ navigation }: Props) {
+export function StatDetailScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
-  const [filters, setFilters] = useState<ActiveFilter[]>([]);
+  const initialFilters: ActiveFilter[] = (route.params?.filters ?? []).map((f) => ({
+    type: 'named' as const,
+    statId: f.statId,
+    statName: f.statName,
+    optionId: f.optionId,
+    optionLabel: f.optionLabel,
+  }));
+  const [filters, setFilters] = useState<ActiveFilter[]>(initialFilters);
   const [entries, setEntries] = useState<RichEntry[]>([]);
   const [entryCount, setEntryCount] = useState<number | null>(null);
   const [numberStats, setNumberStats] = useState<NumberStat[]>([]);
@@ -460,6 +471,7 @@ export function StatDetailScreen({ navigation }: Props) {
   const [initialLoading, setInitialLoading] = useState(true);
   const [statEntryCount, setStatEntryCount] = useState<Record<string, number>>({});
   const [expandedStatId, setExpandedStatId] = useState<string | null>(null);
+  const [savedLevels, setSavedLevels] = useState<Level[]>([]);
 
   useEffect(() => {
     Promise.all([getNumberStats(), getChoiceStats(), getAllChoiceOptions()])
@@ -469,6 +481,10 @@ export function StatDetailScreen({ navigation }: Props) {
         setAllOptions(options);
       })
       .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    getLevels().then(setSavedLevels).catch(console.error);
   }, []);
 
   const reload = useCallback(async (activeFilters: ActiveFilter[]) => {
@@ -491,7 +507,41 @@ export function StatDetailScreen({ navigation }: Props) {
   }, []);
 
   useEffect(() => { reload(filters).catch(console.error); }, [filters, reload]);
-  useEffect(() => { return navigation.addListener('focus', () => reload(filters).catch(console.error)); }, [navigation, filters, reload]);
+  useEffect(() => {
+    return navigation.addListener('focus', () => {
+      reload(filters).catch(console.error);
+      getLevels().then(setSavedLevels).catch(console.error);
+    });
+  }, [navigation, filters, reload]);
+
+  const choiceFilters = filters.filter((f): f is ChoiceFilter => f.type === 'named');
+
+  const existingLevel = choiceFilters.length > 0
+    ? savedLevels.find((lv) =>
+        lv.filters.length === choiceFilters.length &&
+        lv.filters.every((lf) => choiceFilters.some((cf) => cf.statId === lf.statId && cf.optionId === lf.optionId)),
+      )
+    : undefined;
+
+  const handleStarPress = useCallback(() => {
+    if (choiceFilters.length === 0) return;
+    if (existingLevel) {
+      navigation.navigate('LevelCelebration', { levelId: existingLevel.id });
+      return;
+    }
+    Alert.prompt(
+      'Save level',
+      'Give this filter set a name:',
+      async (name) => {
+        if (!name?.trim()) return;
+        const id = await insertLevel(name.trim(), choiceFilters.map((f) => ({ statId: f.statId, optionId: f.optionId })));
+        setSavedLevels(await getLevels());
+        navigation.navigate('LevelCelebration', { levelId: id });
+      },
+      'plain-text',
+      '',
+    );
+  }, [choiceFilters, existingLevel, navigation]);
 
   const filteredStatIds = new Set(filters.map((f) => f.statId));
 
@@ -527,10 +577,24 @@ export function StatDetailScreen({ navigation }: Props) {
     .filter((p) => !filteredStatIds.has(p.id))
     .sort((a, b) => (statEntryCount[b.id] ?? 0) - (statEntryCount[a.id] ?? 0));
 
+  const starElement = (
+    <TouchableOpacity
+      onPress={handleStarPress}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      disabled={choiceFilters.length === 0}
+    >
+      <Ionicons
+        name={existingLevel ? 'star' : 'star-outline'}
+        size={22}
+        color={choiceFilters.length === 0 ? Colors.textDisabled : existingLevel ? '#F5A623' : Colors.textMuted}
+      />
+    </TouchableOpacity>
+  );
+
   if (initialLoading) {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
-        <ScreenHeader title="Stats" onBack={() => navigation.goBack()} />
+        <ScreenHeader title="Stats" onBack={() => navigation.goBack()} rightElement={starElement} />
         <ActivityIndicator color={Colors.primary} style={{ flex: 1 }} />
       </View>
     );
@@ -538,7 +602,7 @@ export function StatDetailScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Stats" onBack={() => navigation.goBack()} />
+      <ScreenHeader title="Stats" onBack={() => navigation.goBack()} rightElement={starElement} />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.xl }]}
