@@ -8,7 +8,13 @@ import { UnifiedSessionScreen } from '../screens/UnifiedSessionScreen';
 import { ExercisesScreen } from '../screens/ExercisesScreen';
 import { ExerciseEditorScreen } from '../screens/ExerciseEditorScreen';
 import { StatEditorScreen } from '../screens/StatEditorScreen';
+import { ImportExercisesScreen } from '../screens/ImportExercisesScreen';
 import { Colors } from '../constants/theme';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+
+function ImportExercisesRoute({ navigation }: NativeStackScreenProps<RootStackParamList, 'ImportExercises'>) {
+  return <ImportExercisesScreen onDone={() => navigation.goBack()} />;
+}
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -29,6 +35,7 @@ export function AppNavigator() {
       <Stack.Screen name="Exercises" component={ExercisesScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ExerciseEditor" component={ExerciseEditorScreen} options={{ headerShown: false }} />
       <Stack.Screen name="StatEditor" component={StatEditorScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ImportExercises" component={ImportExercisesRoute} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

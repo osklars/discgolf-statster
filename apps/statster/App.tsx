@@ -7,7 +7,7 @@ import { CreateInterestScreen } from './src/screens/CreateInterestScreen';
 import { ImportExercisesScreen } from './src/screens/ImportExercisesScreen';
 
 function AppRoot() {
-  const { interests, justCreated } = useInterest();
+  const { interests, justCreated, clearJustCreated } = useInterest();
 
   if (interests.length === 0) {
     return (
@@ -22,7 +22,7 @@ function AppRoot() {
     return (
       <>
         <StatusBar style="dark" />
-        <ImportExercisesScreen />
+        <ImportExercisesScreen onDone={clearJustCreated} />
       </>
     );
   }

@@ -54,8 +54,12 @@ for (const t of TEMPLATES) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function ImportExercisesScreen() {
-  const { clearJustCreated, activeInterest } = useInterest();
+interface Props {
+  onDone: () => void;
+}
+
+export function ImportExercisesScreen({ onDone }: Props) {
+  const { activeInterest } = useInterest();
   const insets = useSafeAreaInsets();
 
   const [existingStatIds, setExistingStatIds] = useState<Set<string>>(new Set());
@@ -185,7 +189,7 @@ export function ImportExercisesScreen() {
         await saveExerciseLayout(exerciseId, layout);
       }
 
-      clearJustCreated();
+      onDone();
     } catch (err) {
       console.error('Import failed:', err);
       setImporting(false);
@@ -204,7 +208,7 @@ export function ImportExercisesScreen() {
           <Text style={styles.headerTitle}>Add exercises</Text>
           <Text style={styles.headerSub}>Choose what you want to track.</Text>
         </View>
-        <TouchableOpacity onPress={clearJustCreated} style={styles.skipBtn} activeOpacity={0.7}>
+        <TouchableOpacity onPress={onDone} style={styles.skipBtn} activeOpacity={0.7}>
           <Text style={styles.skipText}>Skip</Text>
         </TouchableOpacity>
       </View>

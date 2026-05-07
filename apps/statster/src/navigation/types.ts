@@ -10,4 +10,5 @@ export type RootStackParamList = {
   Exercises: undefined;
   ExerciseEditor: { exerciseId: string; isNew?: boolean; sortOrder?: number };
   StatEditor: { statType: 'scalar' | 'named'; statId?: string; addToExerciseId?: string; initialName?: string };
+  ImportExercises: undefined;
 };

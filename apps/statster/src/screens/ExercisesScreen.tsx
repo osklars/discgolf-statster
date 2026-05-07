@@ -128,7 +128,11 @@ export function ExercisesScreen({ navigation }: Props) {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.xl }]}
       >
       {/* ── Exercises ── */}
-      <SectionHeader label="Exercises" onNew={handleNewExercise} />
+      <SectionHeader
+        label="Exercises"
+        onNew={handleNewExercise}
+        onBrowse={() => navigation.navigate('ImportExercises')}
+      />
       <View style={styles.card}>
         {exercises.length === 0 ? (
           <Text style={styles.empty}>No exercises yet.</Text>
@@ -245,14 +249,22 @@ export function ExercisesScreen({ navigation }: Props) {
   );
 }
 
-function SectionHeader({ label, onNew }: { label: string; onNew: () => void }) {
+function SectionHeader({ label, onNew, onBrowse }: { label: string; onNew: () => void; onBrowse?: () => void }) {
   return (
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionLabel}>{label.toUpperCase()}</Text>
-      <TouchableOpacity onPress={onNew} style={styles.sectionBtn}>
-        <Feather name="plus" size={15} color={Colors.primary} />
-        <Text style={styles.sectionBtnText}>New</Text>
-      </TouchableOpacity>
+      <View style={styles.sectionActions}>
+        {onBrowse && (
+          <TouchableOpacity onPress={onBrowse} style={styles.sectionBtn}>
+            <Feather name="download" size={15} color={Colors.primary} />
+            <Text style={styles.sectionBtnText}>Browse</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity onPress={onNew} style={styles.sectionBtn}>
+          <Feather name="plus" size={15} color={Colors.primary} />
+          <Text style={styles.sectionBtnText}>New</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -262,6 +274,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, gap: Spacing.md },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sectionActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   sectionLabel: {
     ...Typography.labelSm, color: Colors.textMuted, fontWeight: '600',
     letterSpacing: 0.5, textTransform: 'uppercase',
