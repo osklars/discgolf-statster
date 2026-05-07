@@ -238,7 +238,7 @@ export function StatEditorScreen({ route, navigation }: Props) {
             <View style={styles.row2}>
               <View style={[styles.fieldGroup, styles.flex1]}>
                 <Text style={styles.fieldLabel}>Min</Text>
-                <TextInput style={styles.input} value={min} onChangeText={setMin} keyboardType="decimal-pad" />
+                <TextInput style={styles.input} value={min} onChangeText={setMin} keyboardType="numbers-and-punctuation" />
               </View>
               <View style={[styles.fieldGroup, styles.flex1]}>
                 <Text style={styles.fieldLabel}>Max</Text>
@@ -250,7 +250,7 @@ export function StatEditorScreen({ route, navigation }: Props) {
                   style={styles.input}
                   value={target}
                   onChangeText={setTarget}
-                  keyboardType="decimal-pad"
+                  keyboardType="numbers-and-punctuation"
                   placeholder="opt."
                   placeholderTextColor={Colors.textDisabled}
                 />
