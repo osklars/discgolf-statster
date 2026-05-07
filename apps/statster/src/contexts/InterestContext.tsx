@@ -18,6 +18,7 @@ type InterestContextValue = {
   activeInterest: Interest;
   ready: boolean;
   justCreated: boolean;
+  switching: boolean;
   switchInterest: (id: string) => Promise<void>;
   addInterest: (interest: Omit<Interest, 'id' | 'dbFile'>) => Promise<void>;
   clearJustCreated: () => void;
@@ -30,6 +31,7 @@ export function InterestProvider({ children }: { children: React.ReactNode }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [justCreated, setJustCreated] = useState(false);
+  const [switching, setSwitching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,10 +70,13 @@ export function InterestProvider({ children }: { children: React.ReactNode }) {
     async (id: string) => {
       const interest = interests.find((i) => i.id === id);
       if (!interest) return;
+      // Set activeId first so the loading screen shows the incoming interest.
+      setSwitching(true);
+      setActiveId(id);
       await openInterestDb(interest.dbFile);
       await seedIfEmpty();
       await metaDb.setActiveInterestId(id);
-      setActiveId(id);
+      setSwitching(false);
     },
     [interests],
   );
@@ -107,7 +112,7 @@ export function InterestProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <InterestContext.Provider value={{ interests, activeInterest, ready, justCreated, switchInterest, addInterest, clearJustCreated }}>
+    <InterestContext.Provider value={{ interests, activeInterest, ready, justCreated, switching, switchInterest, addInterest, clearJustCreated }}>
       {children}
     </InterestContext.Provider>
   );
