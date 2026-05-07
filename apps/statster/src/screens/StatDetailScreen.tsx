@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -26,7 +27,7 @@ import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { queryRichEntries } from '../db/queries';
 import type { RichEntry } from '../db/queries';
 import { getNumberStats, getChoiceStats, getAllChoiceOptions } from '../db/parameters';
-import type { NumberStat, ChoiceStat, ChoiceOption } from '../db/types';
+import type { NumberStat, ChoiceStat, ChoiceOption, Exercise } from '../db/types';
 import { getLevels, insertLevel } from '../db/levels';
 import type { Level } from '../db/levels';
 import { getExercises } from '../db/forms';
@@ -36,15 +37,18 @@ type Props = NativeStackScreenProps<RootStackParamList, 'StatDetail'>;
 
 // ── Filter types ──────────────────────────────────────────────────────────────
 
+type ExerciseFilter = { type: 'exercise'; exerciseId: string; exerciseName: string };
 type ChoiceFilter = { type: 'named'; statId: string; statName: string; optionId: string; optionLabel: string };
 type NumberFilter = { type: 'scalar'; statId: string; statName: string; min: number; max: number };
-type ActiveFilter = ChoiceFilter | NumberFilter;
+type ActiveFilter = ExerciseFilter | ChoiceFilter | NumberFilter;
 
 function filterLabel(f: ActiveFilter): string {
+  if (f.type === 'exercise') return f.exerciseName;
   return f.type === 'named' ? f.optionLabel : `${f.statName} ${f.min}–${f.max}`;
 }
 
-function filtersToQuery(filters: ActiveFilter[], exerciseId?: string) {
+function filtersToQuery(filters: ActiveFilter[]) {
+  const exFilter = filters.find((f): f is ExerciseFilter => f.type === 'exercise');
   return {
     choiceFilters: filters
       .filter((f): f is ChoiceFilter => f.type === 'named')
@@ -52,7 +56,7 @@ function filtersToQuery(filters: ActiveFilter[], exerciseId?: string) {
     numberFilters: filters
       .filter((f): f is NumberFilter => f.type === 'scalar')
       .map((f) => ({ statId: f.statId, min: f.min, max: f.max })),
-    exerciseId,
+    exerciseId: exFilter?.exerciseId,
   };
 }
 
@@ -480,39 +484,162 @@ const card = StyleSheet.create({
   optionCount: { ...Typography.labelSm, color: Colors.textMuted, width: 28, textAlign: 'right' },
 });
 
+// ── Exercise card ─────────────────────────────────────────────────────────────
+
+interface ExerciseCardProps {
+  exercises: Exercise[];
+  counts: Record<string, number>;
+  expanded: boolean;
+  onExpand(): void;
+  onCollapse(): void;
+  onSelect(exerciseId: string, exerciseName: string): void;
+}
+
+function ExerciseCard({ exercises, counts, expanded, onExpand, onCollapse, onSelect }: ExerciseCardProps) {
+  const sorted = [...exercises].sort((a, b) => (counts[b.id] ?? 0) - (counts[a.id] ?? 0));
+  if (sorted.length === 0) return null;
+
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const shown = expanded ? sorted : sorted.slice(0, NAMED_PREVIEW_ROWS);
+  const hiddenCount = sorted.length - NAMED_PREVIEW_ROWS;
+
+  const action: CardAction | undefined = expanded
+    ? { label: 'Done', onPress: onCollapse }
+    : hiddenCount > 0
+      ? { label: `+${hiddenCount} more`, onPress: onExpand }
+      : undefined;
+
+  return (
+    <View style={card.container}>
+      <CardHeader title="Exercise" action={action} />
+      <View>
+        {shown.map((ex) => {
+          const count = counts[ex.id] ?? 0;
+          const pct = total > 0 ? count / total : 0;
+          return (
+            <TouchableOpacity
+              key={ex.id}
+              style={[card.optionRow, { height: OPTION_ROW_H }]}
+              activeOpacity={0.7}
+              onPress={() => { onSelect(ex.id, ex.name); onCollapse(); }}
+            >
+              <Text style={card.optionLabel} numberOfLines={1}>{ex.name}</Text>
+              <View style={card.barWrap}>
+                {pct > 0 && <View style={[card.barFill, { flex: pct }]} />}
+                <View style={{ flex: Math.max(1 - pct, 0) }} />
+              </View>
+              <Text style={card.optionCount}>{count > 0 ? count : ''}</Text>
+            </TouchableOpacity>
+          );
+        })}
+        {!expanded && sorted.length === 1 && (
+          <View style={{ height: OPTION_ROW_H }} pointerEvents="none" />
+        )}
+      </View>
+    </View>
+  );
+}
+
+// ── Empty filters section ─────────────────────────────────────────────────────
+
+interface EmptyFiltersSectionProps {
+  choiceStats: ChoiceStat[];
+  allOptions: ChoiceOption[];
+  onSelect(statId: string, statName: string, optionId: string, optionLabel: string): void;
+}
+
+function EmptyFiltersSection({ choiceStats, allOptions, onSelect }: EmptyFiltersSectionProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  const statsWithOptions = choiceStats.filter(
+    (s) => allOptions.some((o) => o.statId === s.id && o.archivedAt === null),
+  );
+  if (statsWithOptions.length === 0) return null;
+
+  return (
+    <View style={empty.root}>
+      <TouchableOpacity style={empty.toggle} onPress={() => setExpanded((v) => !v)} activeOpacity={0.7}>
+        <Text style={empty.toggleText}>More filters</Text>
+        <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color={Colors.textMuted} />
+      </TouchableOpacity>
+      {expanded && (
+        <View style={empty.body}>
+          {statsWithOptions.map((stat) => {
+            const options = allOptions.filter((o) => o.statId === stat.id && o.archivedAt === null);
+            return (
+              <View key={stat.id} style={empty.statGroup}>
+                <Text style={empty.statName}>{stat.name}</Text>
+                {options.map((opt) => (
+                  <TouchableOpacity
+                    key={opt.id}
+                    style={empty.optionRow}
+                    activeOpacity={0.7}
+                    onPress={() => onSelect(stat.id, stat.name, opt.id, opt.label)}
+                  >
+                    <Text style={empty.optionLabel}>{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const empty = StyleSheet.create({
+  root: { backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden' },
+  toggle: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md,
+  },
+  toggleText: { ...Typography.label, color: Colors.textMuted, fontWeight: '600' },
+  body: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.separator },
+  statGroup: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.sm, gap: 4 },
+  statName: { ...Typography.labelSm, color: Colors.textMuted, fontWeight: '600', marginBottom: 4 },
+  optionRow: {
+    paddingVertical: Spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.separator,
+  },
+  optionLabel: { ...Typography.label, color: Colors.text },
+});
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export function StatDetailScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
-  const routeExerciseId = route.params?.exerciseId;
-  const routeExerciseName = route.params?.exerciseName;
 
-  const initialFilters: ActiveFilter[] = (route.params?.filters ?? []).map((f) => ({
-    type: 'named' as const,
-    statId: f.statId,
-    statName: f.statName,
-    optionId: f.optionId,
-    optionLabel: f.optionLabel,
-  }));
+  const initialFilters: ActiveFilter[] = [];
+  if (route.params?.exerciseId && route.params?.exerciseName) {
+    initialFilters.push({ type: 'exercise', exerciseId: route.params.exerciseId, exerciseName: route.params.exerciseName });
+  }
+  for (const f of (route.params?.filters ?? [])) {
+    initialFilters.push({ type: 'named', statId: f.statId, statName: f.statName, optionId: f.optionId, optionLabel: f.optionLabel });
+  }
+
   const [filters, setFilters] = useState<ActiveFilter[]>(initialFilters);
   const [entries, setEntries] = useState<RichEntry[]>([]);
   const [entryCount, setEntryCount] = useState<number | null>(null);
   const [numberStats, setNumberStats] = useState<NumberStat[]>([]);
   const [choiceStats, setChoiceStats] = useState<ChoiceStat[]>([]);
   const [allOptions, setAllOptions] = useState<ChoiceOption[]>([]);
+  const [exercises, setExercises] = useState<Exercise[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [statEntryCount, setStatEntryCount] = useState<Record<string, number>>({});
   const [expandedStatId, setExpandedStatId] = useState<string | null>(null);
+  const [expandedExercise, setExpandedExercise] = useState(false);
   const [savedLevels, setSavedLevels] = useState<Level[]>([]);
   const [sessionNames, setSessionNames] = useState<Record<string, { name: string | null; startedAt: string }>>({});
-  const [exerciseNames, setExerciseNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    Promise.all([getNumberStats(), getChoiceStats(), getAllChoiceOptions()])
-      .then(([scalars, named, options]) => {
+    Promise.all([getNumberStats(), getChoiceStats(), getAllChoiceOptions(), getExercises()])
+      .then(([scalars, named, options, exs]) => {
         setNumberStats(scalars);
         setChoiceStats(named);
         setAllOptions(options);
+        setExercises(exs);
       })
       .catch(console.error);
   }, []);
@@ -521,16 +648,8 @@ export function StatDetailScreen({ navigation, route }: Props) {
     getLevels().then(setSavedLevels).catch(console.error);
   }, []);
 
-  useEffect(() => {
-    getExercises().then((list) => {
-      const map: Record<string, string> = {};
-      for (const ex of list) map[ex.id] = ex.name;
-      setExerciseNames(map);
-    }).catch(console.error);
-  }, []);
-
   const reload = useCallback(async (activeFilters: ActiveFilter[]) => {
-    const query = filtersToQuery(activeFilters, routeExerciseId);
+    const query = filtersToQuery(activeFilters);
     const richEntries = await queryRichEntries(query);
     const counts: Record<string, number> = {};
     for (const entry of richEntries) {
@@ -548,7 +667,7 @@ export function StatDetailScreen({ navigation, route }: Props) {
     setEntryCount(richEntries.length);
     setStatEntryCount(counts);
     setInitialLoading(false);
-  }, [routeExerciseId]);
+  }, []);
 
   useEffect(() => { reload(filters).catch(console.error); }, [filters, reload]);
   useEffect(() => {
@@ -587,10 +706,21 @@ export function StatDetailScreen({ navigation, route }: Props) {
     );
   }, [choiceFilters, existingLevel, navigation]);
 
-  const filteredStatIds = new Set(filters.map((f) => f.statId));
+  const filteredStatIds = new Set(
+    filters.filter((f): f is ChoiceFilter | NumberFilter => f.type !== 'exercise').map((f) => f.statId),
+  );
+  const hasExerciseFilter = filters.some((f) => f.type === 'exercise');
 
   const toggleExpanded = useCallback((id: string) => {
     setExpandedStatId((prev) => (prev === id ? null : id));
+  }, []);
+
+  const addExerciseFilter = useCallback((exerciseId: string, exerciseName: string) => {
+    setFilters((prev) => {
+      const without = prev.filter((f) => f.type !== 'exercise');
+      return [{ type: 'exercise', exerciseId, exerciseName }, ...without];
+    });
+    setExpandedExercise(false);
   }, []);
 
   const addChoiceFilter = useCallback((statId: string, statName: string, optionId: string, optionLabel: string) => {
@@ -610,12 +740,27 @@ export function StatDetailScreen({ navigation, route }: Props) {
   }, []);
 
   const removeFilter = useCallback((toRemove: ActiveFilter) => {
-    setFilters((prev) => prev.filter((f) => f.statId !== toRemove.statId));
+    setFilters((prev) => prev.filter((f) => {
+      if (toRemove.type === 'exercise') return f.type !== 'exercise';
+      return f.type === 'exercise' || f.statId !== toRemove.statId;
+    }));
   }, []);
 
-  const sortedChoice = [...choiceStats]
-    .filter((p) => !filteredStatIds.has(p.id))
+  // Derive exercise entry counts from the already-filtered entries
+  const exerciseCounts: Record<string, number> = {};
+  for (const e of entries) exerciseCounts[e.exerciseId] = (exerciseCounts[e.exerciseId] ?? 0) + 1;
+
+  const exerciseNamesMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const ex of exercises) map[ex.id] = ex.name;
+    return map;
+  }, [exercises]);
+
+  const nonFilteredChoice = [...choiceStats].filter((p) => !filteredStatIds.has(p.id));
+  const sortedChoice = nonFilteredChoice
+    .filter((p) => (statEntryCount[p.id] ?? 0) > 0)
     .sort((a, b) => (statEntryCount[b.id] ?? 0) - (statEntryCount[a.id] ?? 0));
+  const emptyChoiceStats = nonFilteredChoice.filter((p) => (statEntryCount[p.id] ?? 0) === 0);
 
   const sortedNumber = [...numberStats]
     .filter((p) => !filteredStatIds.has(p.id))
@@ -637,15 +782,12 @@ export function StatDetailScreen({ navigation, route }: Props) {
     const bLast = bySession[b][bySession[b].length - 1]?.loggedAt ?? '';
     return bLast.localeCompare(aLast);
   });
-  // If exerciseId filter is set, all entries share the same exercise — hide per-row name
-  const showExerciseName = !routeExerciseId;
-
-  const screenTitle = routeExerciseName ?? 'Stats';
+  const showExerciseName = !hasExerciseFilter;
 
   if (initialLoading) {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
-        <ScreenHeader title={screenTitle} onBack={() => navigation.goBack()} />
+        <ScreenHeader title="Stats" onBack={() => navigation.goBack()} />
         <ActivityIndicator color={Colors.primary} style={{ flex: 1 }} />
       </View>
     );
@@ -653,7 +795,7 @@ export function StatDetailScreen({ navigation, route }: Props) {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <ScreenHeader title={screenTitle} onBack={() => navigation.goBack()} />
+      <ScreenHeader title="Stats" onBack={() => navigation.goBack()} />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.xl }]}
@@ -667,6 +809,18 @@ export function StatDetailScreen({ navigation, route }: Props) {
           isAlreadySaved={!!existingLevel}
           onSave={handleStarPress}
         />
+
+        {/* Exercise picker — hidden when an exercise filter is already active */}
+        {!hasExerciseFilter && exercises.length > 0 && (
+          <ExerciseCard
+            exercises={exercises}
+            counts={exerciseCounts}
+            expanded={expandedExercise}
+            onExpand={() => setExpandedExercise(true)}
+            onCollapse={() => setExpandedExercise(false)}
+            onSelect={addExerciseFilter}
+          />
+        )}
 
         {sortedChoice.map((param) => {
           const options = allOptions.filter((o) => o.statId === param.id && o.archivedAt === null);
@@ -702,6 +856,14 @@ export function StatDetailScreen({ navigation, route }: Props) {
           );
         })}
 
+        {emptyChoiceStats.length > 0 && (
+          <EmptyFiltersSection
+            choiceStats={emptyChoiceStats}
+            allOptions={allOptions}
+            onSelect={addChoiceFilter}
+          />
+        )}
+
         {/* Entry feed */}
         {sessionOrder.length > 0 && (
           <View style={feed.section}>
@@ -720,7 +882,7 @@ export function StatDetailScreen({ navigation, route }: Props) {
                       <View key={entry.id} style={feed.entryRow}>
                         {showExerciseName && (
                           <Text style={feed.entryExercise}>
-                            {exerciseNames[entry.exerciseId] ?? ''}
+                            {exerciseNamesMap[entry.exerciseId] ?? ''}
                           </Text>
                         )}
                         {summary.length > 0 && (
