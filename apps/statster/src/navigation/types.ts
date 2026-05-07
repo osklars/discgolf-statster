@@ -4,7 +4,7 @@ export type { LevelFilter };
 
 export type RootStackParamList = {
   Home: undefined;
-  StatDetail: { filters?: LevelFilter[] } | undefined;
+  StatDetail: { filters?: LevelFilter[]; exerciseId?: string; exerciseName?: string } | undefined;
   Levels: undefined;
   UnifiedSession: { sessionId?: string } | undefined;
   Exercises: undefined;

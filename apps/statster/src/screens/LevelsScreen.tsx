@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
-import { Colors, Radius, Spacing, Typography, hairline } from '../constants/theme';
+import { Colors, Radius, Spacing, Typography } from '../constants/theme';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useInterest } from '../contexts/InterestContext';
 import { getLevels, deleteLevel } from '../db/levels';
@@ -188,9 +188,20 @@ export function LevelsScreen({ navigation }: Props) {
             <View key={rowIdx} style={styles.row}>
               {pair.map((item, colIdx) =>
                 item ? (
-                  <View key={item.id} style={styles.cell}>
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.cell}
+                    activeOpacity={0.75}
+                    onPress={() => {
+                      if (item.kind === 'exercise') {
+                        navigation.navigate('StatDetail', { exerciseId: item.id, exerciseName: item.name });
+                      } else {
+                        navigation.navigate('StatDetail', { filters: item.filters });
+                      }
+                    }}
+                  >
                     <LevelCard item={item} accentColor={accentColor} onDelete={item.kind === 'custom' ? () => handleDelete(item) : undefined} />
-                  </View>
+                  </TouchableOpacity>
                 ) : (
                   <View key={`empty-${colIdx}`} style={styles.cell} />
                 ),
@@ -215,18 +226,6 @@ export function LevelsScreen({ navigation }: Props) {
           </View>
         </View>
       </ScrollView>
-
-      {/* Analyse button */}
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
-        <TouchableOpacity
-          style={[styles.analyseBtn, { borderColor: accentColor }]}
-          activeOpacity={0.75}
-          onPress={() => navigation.navigate('StatDetail', {})}
-        >
-          <Feather name="bar-chart-2" size={16} color={accentColor} />
-          <Text style={[styles.analyseBtnText, { color: accentColor }]}>Analyse data</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
@@ -268,22 +267,4 @@ const styles = StyleSheet.create({
   },
   addCardText: { ...Typography.label, color: Colors.textDisabled, fontWeight: '600' },
   addCardSub: { ...Typography.labelSm, color: Colors.textDisabled, textAlign: 'center', lineHeight: 16 },
-  // Footer
-  footer: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    borderTopWidth: hairline,
-    borderTopColor: Colors.separator,
-    backgroundColor: Colors.background,
-  },
-  analyseBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.md,
-    borderWidth: 1.5,
-  },
-  analyseBtnText: { ...Typography.body, fontWeight: '700' },
 });

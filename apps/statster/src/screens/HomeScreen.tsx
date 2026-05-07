@@ -187,41 +187,33 @@ export function HomeScreen({ navigation }: Props) {
         </TouchableOpacity>
 
         {/* Level cards grid */}
-        {(top4.length > 0 || true) && (
-          <TouchableOpacity activeOpacity={1} onPress={() => navigation.navigate('Levels')}>
-            <View style={styles.grid}>
-              {top4.map((lv) => (
-                <TouchableOpacity
-                  key={lv.id}
-                  style={styles.gridCell}
-                  activeOpacity={0.75}
-                  onPress={() => navigation.navigate('Levels')}
-                >
-                  <LevelCard
-                    name={lv.name}
-                    kind={lv.kind}
-                    level={lv.level}
-                    progress={lv.progress}
-                    toNext={lv.toNext}
-                    isMax={lv.isMax}
-                    accentColor={accentColor}
-                  />
-                </TouchableOpacity>
-              ))}
-
-              {/* Ghost "Add level" card */}
+        {top4.length > 0 && (
+          <View style={styles.grid}>
+            {top4.map((lv) => (
               <TouchableOpacity
+                key={lv.id}
                 style={styles.gridCell}
                 activeOpacity={0.75}
-                onPress={() => navigation.navigate('StatDetail', {})}
+                onPress={() => {
+                  if (lv.kind === 'exercise') {
+                    navigation.navigate('StatDetail', { exerciseId: lv.id, exerciseName: lv.name });
+                  } else {
+                    navigation.navigate('StatDetail', { filters: lv.filters });
+                  }
+                }}
               >
-                <View style={styles.addCard}>
-                  <Feather name="plus" size={20} color={Colors.textDisabled} />
-                  <Text style={styles.addCardText}>Add level</Text>
-                </View>
+                <LevelCard
+                  name={lv.name}
+                  kind={lv.kind}
+                  level={lv.level}
+                  progress={lv.progress}
+                  toNext={lv.toNext}
+                  isMax={lv.isMax}
+                  accentColor={accentColor}
+                />
               </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
+            ))}
+          </View>
         )}
 
         {/* Sessions */}
@@ -298,20 +290,6 @@ const styles = StyleSheet.create({
   // Grid
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
   gridCell: { width: '47%' },
-  addCard: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    borderWidth: 1.5,
-    borderColor: Colors.separator,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.xl,
-    gap: Spacing.sm,
-    minHeight: 110,
-  },
-  addCardText: { ...Typography.labelSm, color: Colors.textDisabled, fontWeight: '600' },
   // Sessions
   sectionTitle: { ...Typography.title, color: Colors.text, marginTop: Spacing.sm },
   sessionCard: {

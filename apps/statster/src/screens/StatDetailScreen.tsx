@@ -29,6 +29,8 @@ import { getNumberStats, getChoiceStats, getAllChoiceOptions } from '../db/param
 import type { NumberStat, ChoiceStat, ChoiceOption } from '../db/types';
 import { getLevels, insertLevel } from '../db/levels';
 import type { Level } from '../db/levels';
+import { getExercises } from '../db/forms';
+import { getSessionNames } from '../db/sessions';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'StatDetail'>;
 
@@ -42,7 +44,7 @@ function filterLabel(f: ActiveFilter): string {
   return f.type === 'named' ? f.optionLabel : `${f.statName} ${f.min}–${f.max}`;
 }
 
-function filtersToQuery(filters: ActiveFilter[]) {
+function filtersToQuery(filters: ActiveFilter[], exerciseId?: string) {
   return {
     choiceFilters: filters
       .filter((f): f is ChoiceFilter => f.type === 'named')
@@ -50,7 +52,12 @@ function filtersToQuery(filters: ActiveFilter[]) {
     numberFilters: filters
       .filter((f): f is NumberFilter => f.type === 'scalar')
       .map((f) => ({ statId: f.statId, min: f.min, max: f.max })),
+    exerciseId,
   };
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-SE', { month: 'short', day: 'numeric' });
 }
 
 // ── Summary card ──────────────────────────────────────────────────────────────
@@ -477,6 +484,9 @@ const card = StyleSheet.create({
 
 export function StatDetailScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const routeExerciseId = route.params?.exerciseId;
+  const routeExerciseName = route.params?.exerciseName;
+
   const initialFilters: ActiveFilter[] = (route.params?.filters ?? []).map((f) => ({
     type: 'named' as const,
     statId: f.statId,
@@ -494,6 +504,8 @@ export function StatDetailScreen({ navigation, route }: Props) {
   const [statEntryCount, setStatEntryCount] = useState<Record<string, number>>({});
   const [expandedStatId, setExpandedStatId] = useState<string | null>(null);
   const [savedLevels, setSavedLevels] = useState<Level[]>([]);
+  const [sessionNames, setSessionNames] = useState<Record<string, { name: string | null; startedAt: string }>>({});
+  const [exerciseNames, setExerciseNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     Promise.all([getNumberStats(), getChoiceStats(), getAllChoiceOptions()])
@@ -509,8 +521,16 @@ export function StatDetailScreen({ navigation, route }: Props) {
     getLevels().then(setSavedLevels).catch(console.error);
   }, []);
 
+  useEffect(() => {
+    getExercises().then((list) => {
+      const map: Record<string, string> = {};
+      for (const ex of list) map[ex.id] = ex.name;
+      setExerciseNames(map);
+    }).catch(console.error);
+  }, []);
+
   const reload = useCallback(async (activeFilters: ActiveFilter[]) => {
-    const query = filtersToQuery(activeFilters);
+    const query = filtersToQuery(activeFilters, routeExerciseId);
     const richEntries = await queryRichEntries(query);
     const counts: Record<string, number> = {};
     for (const entry of richEntries) {
@@ -522,11 +542,13 @@ export function StatDetailScreen({ navigation, route }: Props) {
         }
       }
     }
+    const uniqueSessionIds = [...new Set(richEntries.map((e) => e.sessionId))];
+    setSessionNames(await getSessionNames(uniqueSessionIds));
     setEntries(richEntries);
     setEntryCount(richEntries.length);
     setStatEntryCount(counts);
     setInitialLoading(false);
-  }, []);
+  }, [routeExerciseId]);
 
   useEffect(() => { reload(filters).catch(console.error); }, [filters, reload]);
   useEffect(() => {
@@ -599,10 +621,31 @@ export function StatDetailScreen({ navigation, route }: Props) {
     .filter((p) => !filteredStatIds.has(p.id))
     .sort((a, b) => (statEntryCount[b.id] ?? 0) - (statEntryCount[a.id] ?? 0));
 
+  // Build entry feed grouped by session (most recent session first)
+  const sessionOrder: string[] = [];
+  const bySession: Record<string, RichEntry[]> = {};
+  for (const e of entries) {
+    if (!bySession[e.sessionId]) {
+      sessionOrder.push(e.sessionId);
+      bySession[e.sessionId] = [];
+    }
+    bySession[e.sessionId].push(e);
+  }
+  // Sort sessions: most recent first (by latest loggedAt in group)
+  sessionOrder.sort((a, b) => {
+    const aLast = bySession[a][bySession[a].length - 1]?.loggedAt ?? '';
+    const bLast = bySession[b][bySession[b].length - 1]?.loggedAt ?? '';
+    return bLast.localeCompare(aLast);
+  });
+  // If exerciseId filter is set, all entries share the same exercise — hide per-row name
+  const showExerciseName = !routeExerciseId;
+
+  const screenTitle = routeExerciseName ?? 'Stats';
+
   if (initialLoading) {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
-        <ScreenHeader title="Stats" onBack={() => navigation.goBack()} />
+        <ScreenHeader title={screenTitle} onBack={() => navigation.goBack()} />
         <ActivityIndicator color={Colors.primary} style={{ flex: 1 }} />
       </View>
     );
@@ -610,7 +653,7 @@ export function StatDetailScreen({ navigation, route }: Props) {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Stats" onBack={() => navigation.goBack()} />
+      <ScreenHeader title={screenTitle} onBack={() => navigation.goBack()} />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.xl }]}
@@ -658,6 +701,39 @@ export function StatDetailScreen({ navigation, route }: Props) {
             />
           );
         })}
+
+        {/* Entry feed */}
+        {sessionOrder.length > 0 && (
+          <View style={feed.section}>
+            <Text style={feed.sectionTitle}>Entries</Text>
+            {sessionOrder.map((sessionId) => {
+              const meta = sessionNames[sessionId];
+              const label = meta?.name ?? (meta?.startedAt ? formatDate(meta.startedAt) : 'Session');
+              return (
+                <View key={sessionId} style={feed.group}>
+                  <Text style={feed.groupHeader}>{label}</Text>
+                  {bySession[sessionId].map((entry) => {
+                    const chips = entry.named.map((dp) => dp.optionLabel);
+                    const nums = entry.scalars.map((dp) => `${dp.value}${dp.unit ?? ''}`);
+                    const summary = [...chips, ...nums].join(' · ');
+                    return (
+                      <View key={entry.id} style={feed.entryRow}>
+                        {showExerciseName && (
+                          <Text style={feed.entryExercise}>
+                            {exerciseNames[entry.exerciseId] ?? ''}
+                          </Text>
+                        )}
+                        {summary.length > 0 && (
+                          <Text style={feed.entrySummary} numberOfLines={1}>{summary}</Text>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -667,4 +743,22 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
   scroll: { flex: 1 },
   content: { padding: Spacing.lg, gap: Spacing.md },
+});
+
+const feed = StyleSheet.create({
+  section: { gap: Spacing.sm },
+  sectionTitle: { ...Typography.label, color: Colors.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 11 },
+  group: { backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden' },
+  groupHeader: {
+    ...Typography.labelSm, color: Colors.textMuted, fontWeight: '600',
+    paddingHorizontal: Spacing.md, paddingTop: Spacing.md, paddingBottom: Spacing.xs,
+  },
+  entryRow: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.separator,
+  },
+  entryExercise: { ...Typography.label, color: Colors.text, fontWeight: '600' },
+  entrySummary: { ...Typography.labelSm, color: Colors.textMuted },
 });

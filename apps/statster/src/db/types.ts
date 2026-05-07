@@ -108,4 +108,5 @@ export type EntryQueryFilters = {
   numberFilters?: NumberFilter[];
   choiceFilters?: ChoiceFilter[];
   sessionId?: string;
+  exerciseId?: string;
 };

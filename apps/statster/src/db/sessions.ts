@@ -42,6 +42,20 @@ export async function getSession(id: string): Promise<Session | null> {
   return row ? toSession(row) : null;
 }
 
+export async function getSessionNames(
+  ids: string[],
+): Promise<Record<string, { name: string | null; startedAt: string }>> {
+  if (ids.length === 0) return {};
+  const placeholders = ids.map(() => '?').join(', ');
+  const rows = await getInterestDb().getAllAsync<{ id: string; name: string | null; started_at: string }>(
+    `SELECT id, name, started_at FROM session WHERE id IN (${placeholders})`,
+    ids,
+  );
+  const result: Record<string, { name: string | null; startedAt: string }> = {};
+  for (const r of rows) result[r.id] = { name: r.name, startedAt: r.started_at };
+  return result;
+}
+
 export async function getSessionsWithEntryCounts(): Promise<SessionSummary[]> {
   const rows = await getInterestDb().getAllAsync<{ id: string; started_at: string; entry_count: number; name: string | null }>(
     `SELECT s.id, s.started_at, s.name, COUNT(e.id) AS entry_count

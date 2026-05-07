@@ -21,7 +21,7 @@ function toEntry(r: EntryRow): Entry {
  * named_datapoint for that stat matching one of the given option IDs.
  */
 export async function queryEntries(filters: EntryQueryFilters): Promise<Entry[]> {
-  const { numberFilters = [], choiceFilters = [], sessionId } = filters;
+  const { numberFilters = [], choiceFilters = [], sessionId, exerciseId } = filters;
 
   let joins = '';
   const params: (string | number)[] = [];
@@ -45,11 +45,10 @@ export async function queryEntries(filters: EntryQueryFilters): Promise<Entry[]>
     params.push(cf.statId, ...cf.optionIds);
   }
 
-  let where = '';
-  if (sessionId) {
-    where = 'WHERE e.session_id = ?';
-    params.push(sessionId);
-  }
+  const conditions: string[] = [];
+  if (sessionId) { conditions.push('e.session_id = ?'); params.push(sessionId); }
+  if (exerciseId) { conditions.push('e.form_id = ?'); params.push(exerciseId); }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const sql = `SELECT DISTINCT e.*
                FROM entry e${joins}
@@ -67,7 +66,9 @@ export type RichEntryChoice = { statId: string; statName: string; optionId: stri
 
 export type RichEntry = {
   id: string;
+  sessionId: string;
   exerciseId: string;
+  entryNumber: number;
   loggedAt: string;
   scalars: RichEntryNumber[];
   named: RichEntryChoice[];
@@ -124,7 +125,9 @@ export async function queryRichEntries(filters: EntryQueryFilters): Promise<Rich
 
   return entries.map((e) => ({
     id: e.id,
+    sessionId: e.sessionId,
     exerciseId: e.exerciseId,
+    entryNumber: e.entryNumber,
     loggedAt: e.loggedAt,
     scalars: scalarsByEntry.get(e.id) ?? [],
     named: namedByEntry.get(e.id) ?? [],
