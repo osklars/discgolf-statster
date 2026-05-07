@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -30,7 +31,7 @@ function formatDate(dateStr: string): string {
 
 export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { activeInterest } = useInterest();
+  const { activeInterest, addInterest } = useInterest();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [overallCount, setOverallCount] = useState<number | null>(null);
@@ -85,7 +86,18 @@ export function HomeScreen({ navigation }: Props) {
       <InterestSwitcherSheet
         visible={switcherOpen}
         onClose={() => setSwitcherOpen(false)}
-        onAddInterest={() => setSwitcherOpen(false)}
+        onAddInterest={() => {
+          setSwitcherOpen(false);
+          Alert.prompt(
+            'New interest',
+            'Enter a name (e.g. "Guitar", "Gym")',
+            async (name) => {
+              if (!name?.trim()) return;
+              await addInterest({ name: name.trim(), emoji: '🏆', color: '#0C447C' });
+            },
+            'plain-text',
+          );
+        }}
       />
 
       <ScrollView
